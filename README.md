@@ -14,11 +14,11 @@ It's free to use and modify.
 
 
 ---
-[[_TOC_]]
+__TOC__
 ---
 
 ## License
-[Apache 2.0](LICENSE)
+[MIT No Attribution](LICENSE)
 
 ----
 
@@ -29,7 +29,7 @@ Overall working time is measured by outerTimer.
 innerTimer measures time of coping data from IDataReader to list/arrays.
 
 
-####Fast DataLoader
+#### Fast DataLoader
 
 
 `
@@ -54,7 +54,7 @@ innerTimer measures time of coping data from IDataReader to list/arrays.
 			outerTimer.Stop();
 `
 
-####Standard method
+#### Standard method
 
 `
 			outerTimer.Start();
@@ -83,7 +83,7 @@ innerTimer measures time of coping data from IDataReader to list/arrays.
 				}
 `
 
-###CompareSpeed: read 1'000'000 times top 1 records
+### CompareSpeed: read 1'000'000 times top 1 records
 
 Using DataLoader: Inner timer: 00:00:06.9385924. Outer timer: 00:07:52.1697057.
 
@@ -107,7 +107,7 @@ Standard  method: Inner timer: 00:00:03.7903551. Outer timer: 00:08:00.1455061.
 
 
 
-###CompareSpeed: read 1'000'000 times top 100 records
+### CompareSpeed: read 1'000'000 times top 100 records
 
 Using DataLoader: Inner timer: 00:00:34.9465023. Outer timer: 00:08:59.3660514.
 
@@ -130,7 +130,7 @@ Using DataLoader: Inner timer: 00:00:36.5856987. Outer timer: 00:09:06.8530580.
 Standard  method: Inner timer: 00:00:38.0171344. Outer timer: 00:09:10.1004365.
 
 
-###CompareSpeed: read 1'000'000 times top 10000 records
+### CompareSpeed: read 1'000'000 times top 10000 records
 Using DataLoader: Inner timer: 01:16:05.0324473. Outer timer: 01:33:24.1436326.
 
 Standard  method: Inner timer: 01:04:26.2259246. Outer timer: 01:20:45.0832207.
