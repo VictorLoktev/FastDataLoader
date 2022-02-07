@@ -13,26 +13,24 @@ and does it in maximum performance way using compiled Expressions.
 It's free to use and modify.
 
 
----
-__TOC__
----
+----
 
 ## License
 [MIT No Attribution](LICENSE)
 
-----
+---
 
 ## Performance tests
 
 Overall working time is measured by outerTimer.
 
-innerTimer measures time of coping data from IDataReader to list/arrays.
+The time of coping data from IDataReader to list/arrays is measured by innerTimer.
 
 
 #### Fast DataLoader
 
 
-`
+```
 			outerTimer.Start();
 			for( int i = 0; i < 1_000_000; i++ )
 			{
@@ -52,11 +50,11 @@ innerTimer measures time of coping data from IDataReader to list/arrays.
 				}
 			}
 			outerTimer.Stop();
-`
+```
 
 #### Standard method
 
-`
+```
 			outerTimer.Start();
 			for( int i = 0; i < 1_000_000; i++ )
 			{
@@ -81,7 +79,7 @@ innerTimer measures time of coping data from IDataReader to list/arrays.
 
 					reader.Dispose();
 				}
-`
+```
 
 ### CompareSpeed: read 1'000'000 times top 1 records
 
