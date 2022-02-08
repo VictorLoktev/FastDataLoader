@@ -130,6 +130,8 @@ namespace FastDataLoader
 			}
 
 
+			#region Поиск подходящего конструктора
+
 			// Считаем кол-во конструкторов с 2-мя и более параметрами
 			int manyParametersCtor = 0;
 			ConstructorInfo foundCtor = null;
@@ -169,7 +171,52 @@ namespace FastDataLoader
 					break;
 				}
 			}
-			if( !IsSimple( typeof( T ) ) &&
+
+			#endregion
+			#region Поиск метода преобразования типа, если тип колонки и принимающего элемента не совпадают
+
+			MethodInfo castMethod = null;
+
+			if( readerFieldCount == 1 &&
+				( Nullable.GetUnderlyingType( typeof( T ) ) ?? typeof( T ) )
+				!= ( Nullable.GetUnderlyingType( ReaderTypes[ 0 ] ) ?? ReaderTypes[ 0 ] ) )
+			{
+				foreach( MethodInfo mi in typeof( T ).GetMethods( BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static ) )
+				{
+					// Тип, являющийся элементом массива должен иметь статический метод,
+					// возвращающий массив нужного типа и принимающий ровно 1 параметр типа string
+					ParameterInfo[] pi = mi.GetParameters();
+					if( mi.IsStatic &&
+						mi.ReturnType == typeof( T ) &&
+						pi != null &&
+						pi.Length == 1 &&
+						pi[ 0 ].ParameterType == ReaderTypes[ 0 ] )
+					{
+						castMethod = mi;
+					}
+				}
+			}
+
+			#endregion
+
+			/*
+			 * Когда в выборке одно поле, принимается как одно значение
+			 * и тип простой, то нам не нужны конструкторы
+			 * или иные присвоения - IDataReader и так возвращает значение,
+			 * нам лишь нужно взять значение из IDataReader[0] и вернуть его,
+			 * земенив DBNull.Value на null.
+			 * Все это не относится и к строке, т.к. string - это class.
+			 * У строки и у Guid'а нет конструктора с соответствующим типом.
+			 * У int? нет конструктора с аргументом, принимающим null.
+			 */
+			bool directCopy = readerFieldCount == 1 &&
+				 ( typeof( T ) == ReaderTypes[ 0 ]
+				 || Nullable.GetUnderlyingType( typeof( T ) ) == ReaderTypes[ 0 ]
+				 || typeof( T ) != ReaderTypes[ 0 ] && castMethod != null );
+
+
+			if( !directCopy &&
+				!IsSimple( typeof( T ) ) &&
 				foundCtor == null &&
 				manyParametersCtor > 0 )
 			{
@@ -200,26 +247,14 @@ namespace FastDataLoader
 			var indexerInfo = typeof( IDataRecord ).GetProperty( "Item", new[] { typeof( int ) } );
 			var invalidParameterExpression = typeof( DataLoaderException ).GetConstructor( new Type[] { typeof( string ) } );
 
-			if( readerFieldCount == 1 &&
-				 IsSimple( typeof( T ) ) )
+			if( directCopy )
 			{
-				/*
-				 * Когда в выборке одно поле, принимается как одно значение
-				 * и тип простой, то нам не нужны конструкторы
-				 * или иные присвоения - IDataReader и так возвращает значение,
-				 * нам лишь нужно взять значение из IDataReader[0] и вернуть его,
-				 * земенив DBNull.Value на null.
-				 * Все это не относится и к строке, т.к. string - это class.
-				 * У строки и у Guid'а нет конструктора с соответствующим типом.
-				 * У int? нет конструктора с аргументом, принимающим null.
-				 */
-
 				Type type = typeof( T );
 
 				var block = ExpressionForConstructor(
 					0, ReaderTypes[ 0 ], ReaderNames[ 0 ],
 					type, null,
-					paramExp, indexerInfo, invalidParameterExpression );
+					paramExp, indexerInfo, invalidParameterExpression, castMethod );
 
 				exps.Add( block );
 
@@ -239,7 +274,7 @@ namespace FastDataLoader
 					var block = ExpressionForConstructor(
 						columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
 						type, paramInfo[ columnIndex ].Name,
-						paramExp, indexerInfo, invalidParameterExpression );
+						paramExp, indexerInfo, invalidParameterExpression, null );
 
 					ctorExps.Add( block );
 				}
@@ -266,9 +301,9 @@ namespace FastDataLoader
 					exps.Add( Expression.Assign( targetExp, Expression.Convert( callExp, targetExp.Type ) ) );
 				}
 
-                #region инициализация массивов mapped*
+				#region инициализация массивов mapped*
 
-                bool[] mappedColumns = new bool[ readerFieldCount ];
+				bool[] mappedColumns = new bool[ readerFieldCount ];
 				for( int i = 0; i < mappedColumns.Length; i++ )
 				{
 					mappedColumns[ i ] = false;
@@ -334,9 +369,9 @@ namespace FastDataLoader
 					}
 				}
 
-                #region Ошибки, если есть колонки или поля/свойства без сопоставления
+				#region Ошибки, если есть колонки или поля/свойства без сопоставления
 
-                if( options.ExceptionIfUnmappedReaderColumn )
+				if( options.ExceptionIfUnmappedReaderColumn )
 				{
 					StringBuilder sb = new StringBuilder();
 					for( int i = 0; i < readerFieldCount; i++ )
@@ -360,7 +395,7 @@ namespace FastDataLoader
 							$"используйте {nameof( DataLoaderOptions )}.{nameof( DataLoaderOptions.IgnoresColumnNames )}." );
 					}
 				}
-				if( options.ExceptionIfUnmappedFieldOrProperty)
+				if( options.ExceptionIfUnmappedFieldOrProperty )
 				{
 					StringBuilder sb = new StringBuilder();
 					for( int i = 0; i < mapperProperties.Length; i++ )
@@ -406,9 +441,9 @@ namespace FastDataLoader
 					}
 				}
 
-                #endregion
+				#endregion
 
-                exps.Add( targetExp );
+				exps.Add( targetExp );
 				info.Initializer = Expression.Lambda<Func<IDataReader, T>>(
 					Expression.Block( new[] { targetExp }, exps ), paramExp ).Compile();
 			}
@@ -420,8 +455,10 @@ namespace FastDataLoader
 			return info;
 		}
 
-		private static Expression ExpressionForConstructor( int columnIndex, Type columnType, string columnName, Type argType, string argName,
-			Expression paramExp, PropertyInfo indexerInfo, ConstructorInfo invalidParameterExpression )
+		private static Expression ExpressionForConstructor( int columnIndex,
+			Type columnType, string columnName, Type argType, string argName,
+			Expression paramExp, PropertyInfo indexerInfo, ConstructorInfo invalidParameterExpression,
+			MethodInfo castMethod )
 		{
 			// it is NOT a reference type!
 			if( argType.IsClass == false &&
@@ -436,56 +473,64 @@ namespace FastDataLoader
 							: Expression.Convert( varExp, argType )
 					);
 
-                var nullCheckExp = IsNullable( argType )
-                    ? (Expression)condDefaultExp
-                    : Expression.Block(
-                            Expression.IfThen(
-                            Expression.Equal(
-                                varExp,
-                                Expression.Constant( DBNull.Value )
-                            ),
-                            Expression.Throw(
-                                Expression.New( invalidParameterExpression,
-                                Expression.Constant(
-                                    $"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
-                                    ( argName != null
-                                    ? $"параметр конструктора '{argName}' с типом "
-                                    : $"тип "
-                                    ) +
-                                    $"'{GetCSharpTypeName( argType )}' не может " +
-                                    $"принять null из колонки '{columnName}'" ) )
-                                )
-                            ),
-                            condDefaultExp
-                        );
+				var nullCheckExp = IsNullable( argType )
+					? (Expression)condDefaultExp
+					: Expression.Block(
+							Expression.IfThen(
+							Expression.Equal(
+								varExp,
+								Expression.Constant( DBNull.Value )
+							),
+							Expression.Throw(
+								Expression.New( invalidParameterExpression,
+								Expression.Constant(
+									$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
+									( argName != null
+									? $"параметр конструктора '{argName}' с типом "
+									: $"тип "
+									) +
+									$"'{GetCSharpTypeName( argType )}' не может " +
+									$"принять null из колонки '{columnName}'" ) )
+								)
+							),
+							condDefaultExp
+						);
 
-                var block = Expression.TryCatch(
-                    Expression.Block(
-                        new[] { varExp },
-                        Expression.Assign( varExp,
-                            Expression.MakeIndex( paramExp, indexerInfo, new[] { Expression.Constant( columnIndex ) } )
-                        ),
-                        nullCheckExp
-                    ),
-                    Expression.Catch(
-                        typeof( InvalidCastException ),
-                        Expression.Block(
-                            Expression.Throw(
-                                Expression.New( typeof( DataLoaderException ).GetConstructor( new Type[] { typeof( string ) } ),
-                                Expression.Constant(
-                                    $"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
-                                    $"для колонки '{columnName}' не возможно преобразовать " +
-                                    $"из типа '{GetCSharpTypeName( columnType )}' " +
-                                    $"в тип '{GetCSharpTypeName( argType )}'" )
-                                )
-                            ),
-                            // Это ничего не значащий Expression, просто надо что-то вернуть, иначе при компиляции ошибка
-                            Expression.Default( argType )
-                        )
-                    )
-                );
+				var indexerExp = castMethod != null
+					? Expression.Assign( varExp,
+							Expression.Call( castMethod,
+								Expression.Convert( Expression.MakeIndex( paramExp, indexerInfo, new[] { Expression.Constant( columnIndex ) } ), columnType )
+							)
+						)
+					: Expression.Assign( varExp,
+							Expression.MakeIndex( paramExp, indexerInfo, new[] { Expression.Constant( columnIndex ) } )
+						);
 
-                return block;
+				var block = Expression.TryCatch(
+					Expression.Block(
+						new[] { varExp },
+						indexerExp,
+						nullCheckExp
+					),
+					Expression.Catch(
+						typeof( InvalidCastException ),
+						Expression.Block(
+							Expression.Throw(
+								Expression.New( typeof( DataLoaderException ).GetConstructor( new Type[] { typeof( string ) } ),
+								Expression.Constant(
+									$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
+									$"для колонки '{columnName}' не возможно преобразовать " +
+									$"из типа '{GetCSharpTypeName( columnType )}' " +
+									$"в тип '{GetCSharpTypeName( argType )}'" )
+								)
+							),
+							// Это ничего не значащий Expression, просто надо что-то вернуть, иначе при компиляции ошибка
+							Expression.Default( argType )
+						)
+					)
+				);
+
+				return block;
 			}
 			else
 			{
@@ -579,6 +624,54 @@ namespace FastDataLoader
 
 			}
 			else
+
+			#endregion
+			#region Если сложный тип, например geometry, ищем статический метод преобразования
+
+			if( !memberType.IsArray && columnType != memberType )
+			{
+				Expression varCallExp = null;
+				// Если членом класса/структуры является массив, то ищем метод,
+				// принимающий xml в параметре типа string и возвращающий массив элементов типа, как у члена
+				foreach( MethodInfo mi in memberType.GetMethods( BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static ) )
+				{
+					// Тип, являющийся элементом массива должен иметь статический метод,
+					// возвращающий массив нужного типа и принимающий ровно 1 параметр типа string
+					ParameterInfo[] pi = mi.GetParameters();
+					if( mi.IsStatic &&
+						mi.ReturnType == memberType &&
+						pi != null &&
+						pi.Length == 1 &&
+						pi[ 0 ].ParameterType == columnType )
+					{
+						// Если метод преобразования типа найден, делается замена varNullCheckExp со встраиванием вызова
+						varCallExp = Expression.Call( mi,
+								Expression.Condition(
+									Expression.Equal( varExp, Expression.Constant( DBNull.Value ) ),
+									Expression.Default( columnType ),
+									Expression.Convert( varExp, columnType )
+								) );
+					}
+				}
+				if( varCallExp == null )
+				{
+					throw new DataLoaderException( $"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
+						$"поле или свойство '{memberName}' имеет тип {memberType.Name}, " +
+						$"но в типе {memberType.GetElementType().Name} отсутствует метод " +
+						$"private|public static {memberType.Name} AnyNameYouLike({columnType} anyParamName), " +
+						$"который должен делать преобразование типа." );
+				}
+
+				block =
+					Expression.Block(
+							new[] { varExp },
+							Expression.Assign( varExp, indexerExp ),
+							Expression.Assign( Expression.PropertyOrField( targetExp, memberName ), varCallExp )
+						);
+
+			}
+			else
+
 			#endregion
 			{
 				/*
@@ -657,6 +750,8 @@ namespace FastDataLoader
 		/// <returns></returns>
 		public static string GetCSharpTypeName( Type type )
 		{
+			if( type == null )
+				return null;
 			using( var provider = new CSharpCodeProvider() )
 			{
 				return provider.GetTypeOutput( new CodeTypeReference( type ) );

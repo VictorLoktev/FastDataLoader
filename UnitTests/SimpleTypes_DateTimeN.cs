@@ -75,7 +75,7 @@ namespace UnitTests
         public void DateTime12()
         {
             using DbReader reader = new DbReader(
-                "select	A = cast( null as uniqueidentifier )"
+                "select	A = cast( null as date )"
                 );
 
             DateTime? value = reader
