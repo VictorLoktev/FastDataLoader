@@ -43,13 +43,7 @@ namespace FastDataLoader
 				signature.Append( '~' );
 				signature.Append( ReaderTypes[ i ] );
 			}
-			if( options.IgnoresColumnNames == null )
-				options.IgnoresColumnNames = new string[] { };
-			foreach( string ignore in options.IgnoresColumnNames )
-			{
-				signature.Append( "|ignore:" );
-				signature.Append( ignore );
-			}
+			signature.Append( options.ToString() );
 
 			//// Важно чтобы при изменении колонок в DataReader'е (тип, название, очередность),
 			//// а так же при изменении игнорируемых колонок в options
@@ -211,6 +205,7 @@ namespace FastDataLoader
 			 */
 			bool directCopy = readerFieldCount == 1 &&
 				 ( typeof( T ) == ReaderTypes[ 0 ]
+				 || typeof( T ).IsEnum && ReaderTypes[ 0 ] == typeof( int )
 				 || Nullable.GetUnderlyingType( typeof( T ) ) == ReaderTypes[ 0 ]
 				 || typeof( T ) != ReaderTypes[ 0 ] && castMethod != null );
 
@@ -254,7 +249,8 @@ namespace FastDataLoader
 				var block = ExpressionForConstructor(
 					0, ReaderTypes[ 0 ], ReaderNames[ 0 ],
 					type, null,
-					paramExp, indexerInfo, invalidParameterExpression, castMethod );
+					paramExp, indexerInfo, invalidParameterExpression,
+					castMethod, options );
 
 				exps.Add( block );
 
@@ -274,7 +270,8 @@ namespace FastDataLoader
 					var block = ExpressionForConstructor(
 						columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
 						type, paramInfo[ columnIndex ].Name,
-						paramExp, indexerInfo, invalidParameterExpression, null );
+						paramExp, indexerInfo, invalidParameterExpression,
+						null, options );
 
 					ctorExps.Add( block );
 				}
@@ -344,7 +341,7 @@ namespace FastDataLoader
 								var blockExp = ExpressionForPropertyOrField(
 									columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
 									member.PropertyType, member.Name,
-									paramExp, targetExp, indexerInfo, invalidParameterExpression );
+									paramExp, targetExp, indexerInfo, invalidParameterExpression, options );
 								exps.Add( blockExp );
 								break;
 							}
@@ -361,7 +358,7 @@ namespace FastDataLoader
 								var blockExp = ExpressionForPropertyOrField(
 									columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
 									member.FieldType, member.Name,
-									paramExp, targetExp, indexerInfo, invalidParameterExpression );
+									paramExp, targetExp, indexerInfo, invalidParameterExpression, options );
 								exps.Add( blockExp );
 								break;
 							}
@@ -458,9 +455,9 @@ namespace FastDataLoader
 		private static Expression ExpressionForConstructor( int columnIndex,
 			Type columnType, string columnName, Type argType, string argName,
 			Expression paramExp, PropertyInfo indexerInfo, ConstructorInfo invalidParameterExpression,
-			MethodInfo castMethod )
+			MethodInfo castMethod, DataLoaderOptions options )
 		{
-			// it is NOT a reference type!
+			// if it is NOT a reference type
 			if( argType.IsClass == false &&
 				argType.IsInterface == false )
 			{
@@ -495,6 +492,15 @@ namespace FastDataLoader
 							),
 							condDefaultExp
 						);
+
+				if( options.RemoverTrailingZerosForDecimal && argType == typeof( decimal ) )
+				{
+					// Если тип decimal и включена опция отсечения незначащих нулей в конце
+					nullCheckExp = Expression.Divide(
+						nullCheckExp,
+						Expression.Constant( 1.000000000000000000000000000000000m )
+						);
+				}
 
 				var indexerExp = castMethod != null
 					? Expression.Assign( varExp,
@@ -535,12 +541,24 @@ namespace FastDataLoader
 			else
 			{
 				var varExp = Expression.Variable( typeof( object ), "SQL_Column_" + columnName );
+
+				var assignExp =
+					Expression.Assign( varExp,
+						Expression.MakeIndex( paramExp, indexerInfo, new[] { Expression.Constant( columnIndex ) } ) );
+
+				if( options.RemoverTrailingZerosForDecimal && argType == typeof( decimal ) )
+				{
+					// Если тип decimal и включена опция отсечения незначащих нулей в конце
+					assignExp = Expression.Divide(
+						assignExp,
+						Expression.Constant( 1.000000000000000000000000000000000m )
+						);
+				}
+
 				var block = Expression.TryCatch(
 					Expression.Block(
 						new[] { varExp },
-						Expression.Assign( varExp,
-							Expression.MakeIndex( paramExp, indexerInfo, new[] { Expression.Constant( columnIndex ) } )
-						),
+						assignExp,
 						Expression.Condition(
 							Expression.Equal( varExp, Expression.Constant( DBNull.Value ) ),
 							Expression.Default( argType ),
@@ -570,12 +588,29 @@ namespace FastDataLoader
 
 		private static Expression ExpressionForPropertyOrField( int columnIndex,
 			Type columnType, string columnName, Type memberType, string memberName,
-			Expression paramExp, Expression targetExp, PropertyInfo indexerInfo, ConstructorInfo invalidParameterExpression )
+			Expression paramExp, Expression targetExp, PropertyInfo indexerInfo,
+			ConstructorInfo invalidParameterExpression, DataLoaderOptions options )
 		{
 			var columnIndexExp = Expression.Constant( columnIndex );
 			var indexerExp = Expression.MakeIndex( paramExp, indexerInfo, new[] { columnIndexExp } );
 			var varExp = Expression.Variable( typeof( object ), memberName );
 			Expression block;
+
+			Expression sourceWithNullCheckExp =
+				Expression.Condition(
+					Expression.Equal( varExp, Expression.Constant( DBNull.Value ) ),
+					Expression.Default( columnType ),
+					Expression.Convert( varExp, columnType )
+				);
+
+			if( options.RemoverTrailingZerosForDecimal && columnType == typeof( decimal ) )
+			{
+				// Если тип decimal и включена опция отсечения незначащих нулей в конце
+				sourceWithNullCheckExp = Expression.Divide(
+					sourceWithNullCheckExp,
+					Expression.Constant( 1.000000000000000000000000000000000m )
+					);
+			}
 
 			#region Если массив и есть метод преобразования из string в массив нужного типа
 
@@ -595,15 +630,10 @@ namespace FastDataLoader
 						mi.ReturnType.GetElementType() == elementOfArrayType &&
 						pi != null &&
 						pi.Length == 1 &&
-						pi[ 0 ].ParameterType == typeof( string ) )
+						pi[ 0 ].ParameterType == columnType )
 					{
 						// Если метод преобразования типа найден, делается замена varNullCheckExp со встраиванием вызова
-						varCallExp = Expression.Call( mi,
-								Expression.Condition(
-									Expression.Equal( varExp, Expression.Constant( DBNull.Value ) ),
-									Expression.Default( typeof( string ) ),
-									Expression.Convert( varExp, typeof( string ) )
-								) );
+						varCallExp = Expression.Call( mi, sourceWithNullCheckExp );
 					}
 				}
 				if( varCallExp == null )
@@ -628,7 +658,7 @@ namespace FastDataLoader
 			#endregion
 			#region Если сложный тип, например geometry, ищем статический метод преобразования
 
-			if( !memberType.IsArray && columnType != memberType )
+			if( !memberType.IsArray && columnType != memberType && !memberType.IsEnum )
 			{
 				Expression varCallExp = null;
 				// Если членом класса/структуры является массив, то ищем метод,
@@ -645,19 +675,14 @@ namespace FastDataLoader
 						pi[ 0 ].ParameterType == columnType )
 					{
 						// Если метод преобразования типа найден, делается замена varNullCheckExp со встраиванием вызова
-						varCallExp = Expression.Call( mi,
-								Expression.Condition(
-									Expression.Equal( varExp, Expression.Constant( DBNull.Value ) ),
-									Expression.Default( columnType ),
-									Expression.Convert( varExp, columnType )
-								) );
+						varCallExp = Expression.Call( mi, sourceWithNullCheckExp );
 					}
 				}
 				if( varCallExp == null )
 				{
 					throw new DataLoaderException( $"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 						$"поле или свойство '{memberName}' имеет тип {memberType.Name}, " +
-						$"но в типе {memberType.GetElementType().Name} отсутствует метод " +
+						$"но в типе {memberType.Name} отсутствует метод " +
 						$"private|public static {memberType.Name} AnyNameYouLike({columnType} anyParamName), " +
 						$"который должен делать преобразование типа." );
 				}
@@ -680,6 +705,21 @@ namespace FastDataLoader
 				 * но если метода нет, то надо делать проверку на null
 				 */
 
+				Expression unboxOrConvertExp =
+					memberType.IsValueType
+						? Expression.Unbox( varExp, memberType )
+						: Expression.Convert( varExp, memberType );
+
+				if( options.RemoverTrailingZerosForDecimal && columnType == typeof( decimal ) )
+				{
+					// Если тип decimal и включена опция отсечения незначащих нулей в конце
+					unboxOrConvertExp = Expression.Divide(
+						unboxOrConvertExp,
+						Expression.Constant( 1.000000000000000000000000000000000m )
+						);
+				}
+
+
 				if( IsNullable( memberType ) )
 					block = Expression.Block(
 						new[] { varExp },
@@ -688,9 +728,7 @@ namespace FastDataLoader
 							Expression.Condition(
 								Expression.Equal( varExp, Expression.Constant( DBNull.Value ) ),
 								Expression.Default( memberType ),
-								memberType.IsValueType
-									? Expression.Unbox( varExp, memberType )
-									: Expression.Convert( varExp, memberType )
+								unboxOrConvertExp
 							)
 						)
 					);
@@ -712,11 +750,7 @@ namespace FastDataLoader
 									$"принять null из колонки '{columnName}'" ) )
 								)
 							),
-						Expression.Assign( Expression.PropertyOrField( targetExp, memberName ),
-							memberType.IsValueType
-								? Expression.Unbox( varExp, memberType )
-								: Expression.Convert( varExp, memberType )
-							)
+						Expression.Assign( Expression.PropertyOrField( targetExp, memberName ), unboxOrConvertExp )
 					);
 			}
 

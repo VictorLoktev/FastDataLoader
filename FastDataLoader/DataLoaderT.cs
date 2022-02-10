@@ -23,19 +23,19 @@ namespace FastDataLoader
 		{
 			if( reader.IsClosed ||
 				reader.FieldCount == 0 ||
-				options.Limit.HasValue && options.Limit.Value <= 0 )
+				options.LimitRecords.HasValue && options.LimitRecords.Value <= 0 )
 				return null;
 
 			if( info.Initializer == null )
 				throw new DataLoaderException( "Сбой в алгоритме, инициализатор данных не заполнен" );
 
-			List<T> result = options.Limit.HasValue
-				? new List<T>( options.Limit.Value )
+			List<T> result = options.LimitRecords.HasValue
+				? new List<T>( options.LimitRecords.Value )
 				: new List<T>();
 
 			while( reader.Read() )
 			{
-				if( options.Limit == result.Count )
+				if( options.LimitRecords == result.Count )
 					break;
 
 				result.Add( info.Initializer( reader ) );

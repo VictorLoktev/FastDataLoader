@@ -68,7 +68,7 @@ namespace FastDataLoader
 			string ifNoRecordsExceptionMessage = null, string ifManyRecordsExceptionMessage = null )
 		{
 			DataLoaderOptions opt = Options.Clone();
-			opt.Limit = 2;
+			opt.LimitRecords = 2;
 
 			List<T> list = null;
 			if( !Reader.IsClosed )

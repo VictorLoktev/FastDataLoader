@@ -150,5 +150,33 @@ namespace UnitTests
             }
         }
 
+
+        [TestMethod]
+        public void TrailingZerosOn()
+        {
+            using DbReader reader = new DbReader(
+                "select	A = cast( 12345.6700 as numeric(18,8) )"
+                );
+
+            decimal value = reader
+                .Load1<decimal>();
+
+            Assert.AreEqual( "12345.67", value.ToString( "G", System.Globalization.CultureInfo.GetCultureInfo( "en-US" ) ) );
+        }
+
+        [TestMethod]
+        public void TrailingZerosOff()
+        {
+            using DbReader reader = new DbReader(
+                "select	A = cast( 12345.6700 as decimal(18,8) )"
+                );
+
+            decimal value = reader
+                .Load1<decimal>( new DataLoaderOptions() { RemoverTrailingZerosForDecimal = false } );
+
+            Assert.AreEqual( "12345.67000000", value.ToString( "G", System.Globalization.CultureInfo.GetCultureInfo( "en-US" ) ) );
+        }
+
+
     }
 }

@@ -1,4 +1,6 @@
-﻿namespace FastDataLoader
+﻿using System.Text;
+
+namespace FastDataLoader
 {
 	public class DataLoaderOptions
 	{
@@ -25,14 +27,31 @@
 		/// Ограничение количества читаемых записей.
 		/// По умолчанию - без ограничения.
 		/// </summary>
-		public int? Limit { get; set; }
+		public int? LimitRecords { get; set; }
+
+		/// <summary>
+		/// <para>Когда значения колонки IDataReader имеют тип decimal,
+		/// преобразование в строку выдает незначащие нули.</para>
+		/// <para>Например, при чтении из БД cast(123.45 as numeric(18,8)
+		/// с последующим и преобразовании в строку даст 123.45000000</para>
+		/// <para>Подобные незначащие нули можно отрезать,
+		/// если поделить значение на 1.000000000000000000000000000000000m</para>
+		/// <para>И чем делать подобную операцию несколько раз при выводе,
+		/// лучше сделать 1 раз при чтении значения из БД.</para>
+		/// <para>True, если для значений типа decimal сразу отрезаются незначащие нули.</para>
+		/// <para>False, если для значений типа decimal не делается преобразование с отрезанием нулей.</para>
+		/// <para>Если тип не decimal, то изменений не делается в любом случае.</para>
+		/// </summary>
+		public bool RemoverTrailingZerosForDecimal { get; set; }
+
 
 		public DataLoaderOptions()
 		{
 			ExceptionIfUnmappedReaderColumn = true;
 			ExceptionIfUnmappedFieldOrProperty = true;
 			IgnoresColumnNames = new string[] { };
-			Limit = null;
+			LimitRecords = null;
+			RemoverTrailingZerosForDecimal = true;
 		}
 
 		public DataLoaderOptions Clone()
@@ -43,8 +62,31 @@
 					ExceptionIfUnmappedReaderColumn = true,
 					ExceptionIfUnmappedFieldOrProperty = true,
 					IgnoresColumnNames = new string[] { },
-					Limit = null,
+					LimitRecords = null,
 				};
 		}
-	}
+
+        public override string ToString()
+        {
+			StringBuilder sb = new StringBuilder();
+			sb.Append( "ExceptionIfUnmappedReaderColumn: " );
+			sb.Append( ExceptionIfUnmappedReaderColumn );
+			sb.Append( '|' );
+			sb.Append( "ExceptionIfUnmappedFieldOrProperty: " );
+			sb.Append( ExceptionIfUnmappedFieldOrProperty );
+			sb.Append( '|' );
+			sb.Append( "RemoverTrailingZerosForDecimal: " );
+			sb.Append( RemoverTrailingZerosForDecimal );
+		
+			if( IgnoresColumnNames == null )
+				IgnoresColumnNames = new string[] { };
+			foreach( string ignore in IgnoresColumnNames )
+			{
+				sb.Append( "|IgnoresColumnName:" );
+				sb.Append( ignore );
+			}
+
+			return sb.ToString();
+        }
+    }
 }
