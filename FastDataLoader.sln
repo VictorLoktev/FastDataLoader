@@ -11,6 +11,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UnitTests", "UnitTests\Unit
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UnitTestsMsSql", "UnitTestsMsSql\UnitTestsMsSql.csproj", "{BDAF8FC7-B726-4DF1-B910-A0DF29DFD61A}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FastDataLoaderSigned", "FastDataLoader\FastDataLoaderSigned.csproj", "{57C56202-C7E8-4DA5-96E2-994AAFF5600B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{BDAF8FC7-B726-4DF1-B910-A0DF29DFD61A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BDAF8FC7-B726-4DF1-B910-A0DF29DFD61A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BDAF8FC7-B726-4DF1-B910-A0DF29DFD61A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{57C56202-C7E8-4DA5-96E2-994AAFF5600B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{57C56202-C7E8-4DA5-96E2-994AAFF5600B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{57C56202-C7E8-4DA5-96E2-994AAFF5600B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{57C56202-C7E8-4DA5-96E2-994AAFF5600B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
