@@ -4,12 +4,12 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <SignAssembly>True</SignAssembly>
     <AssemblyOriginatorKeyFile>sgKey.snk</AssemblyOriginatorKeyFile>
-    <Version>22.05.17.3</Version>
+    <Version>22.05.17.4</Version>
     <AssemblyVersion></AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.CodeDom" Version="4.7.0" />
+    <PackageReference Include="System.CodeDom" Version="6.0.0" />
   </ItemGroup>
 
 </Project>

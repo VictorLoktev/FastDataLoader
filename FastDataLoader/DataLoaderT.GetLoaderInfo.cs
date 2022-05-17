@@ -75,14 +75,14 @@ namespace FastDataLoader
 
 			PropertyInfo[] allProperties = typeof( T )
 				.GetProperties( BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance )
-				.Where( x => !string.IsNullOrWhiteSpace( x.GetCustomAttributes<ColumnAttribute>().FirstOrDefault()?.Name ?? "use it" ) )
+				.Where( x => UseMember( x.GetCustomAttributes<ColumnAttribute>().FirstOrDefault() ) )
 				.Where( x => x.CanWrite )
 				.ToArray();
 
 			FieldInfo[] allFields = typeof( T )
 				.GetFields( BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance )
+				.Where( x => UseMember( x.GetCustomAttributes<ColumnAttribute>().FirstOrDefault() ) )
 				.Where( x => !x.Name.Contains( "BackingField" ) )   // Поля автосгенерированный из свойств
-				.Where( x => !string.IsNullOrWhiteSpace( x.GetCustomAttributes<ColumnAttribute>().FirstOrDefault()?.Name ?? "use it" ) )
 				.ToArray();
 
 			// Названия колонок могут быть либо такими же, как название члена класса или структуры, либо задаваться атрибутом Column
@@ -107,8 +107,8 @@ namespace FastDataLoader
 			string[] allFieldsColumnNames = new string[ allFields.Length ];
 			for( int i = 0; i < allFields.Length; i++ )
 			{
-				FieldInfo Field = allFields[ i ];
-				ColumnAttribute attr = Field.GetCustomAttributes<ColumnAttribute>().FirstOrDefault();
+				FieldInfo field = allFields[ i ];
+				ColumnAttribute attr = field.GetCustomAttributes<ColumnAttribute>().FirstOrDefault();
 				if( attr != null )
 				{
 					if( !string.IsNullOrWhiteSpace( attr.Name ) )
@@ -120,7 +120,7 @@ namespace FastDataLoader
 					}
 				}
 				else
-					allFieldsColumnNames[ i ] = Field.Name;
+					allFieldsColumnNames[ i ] = field.Name;
 			}
 
 
@@ -153,8 +153,17 @@ namespace FastDataLoader
 				{
 					ParameterInfo parameter = parameters[ index ];
 
-					if( ( Nullable.GetUnderlyingType( parameter.ParameterType ) ?? parameter.ParameterType )
-						!= ( Nullable.GetUnderlyingType( ReaderTypes[ index ] ) ?? ReaderTypes[ index ] ) )
+					Type paramType = Nullable.GetUnderlyingType( parameter.ParameterType ) ?? parameter.ParameterType;
+					Type readerType = Nullable.GetUnderlyingType( ReaderTypes[ index ] ) ?? ReaderTypes[ index ];
+
+					// Если тип параметра конструктура - Enum, то надо сопоставить его с читаемым из БД int
+					if( paramType.IsEnum )
+						paramType =
+							Nullable.GetUnderlyingType( parameter.ParameterType ) == null
+							? paramType.GetEnumUnderlyingType()
+							: typeof( Nullable<> ).MakeGenericType( paramType.GetEnumUnderlyingType() );
+
+					if( paramType != readerType )
 						break;
 
 					paramToColumnIndexer[ index ] = index;
@@ -305,15 +314,15 @@ namespace FastDataLoader
 				{
 					mappedColumns[ i ] = false;
 				}
-				bool[] mapperProperties = new bool[ allProperties.Length ];
-				for( int i = 0; i < mapperProperties.Length; i++ )
+				bool[] mappedProperties = new bool[ allProperties.Length ];
+				for( int i = 0; i < mappedProperties.Length; i++ )
 				{
-					mapperProperties[ i ] = false;
+					mappedProperties[ i ] = false;
 				}
-				bool[] mapperFields = new bool[ allFields.Length ];
-				for( int i = 0; i < mapperFields.Length; i++ )
+				bool[] mappedFields = new bool[ allFields.Length ];
+				for( int i = 0; i < mappedFields.Length; i++ )
 				{
-					mapperFields[ i ] = false;
+					mappedFields[ i ] = false;
 				}
 
 				#endregion
@@ -336,7 +345,7 @@ namespace FastDataLoader
 							if( allPropertiesColumnNames[ memberIndex ] == ReaderNames[ columnIndex ] )
 							{
 								mappedColumns[ columnIndex ] = true;
-								mapperProperties[ memberIndex ] = true;
+								mappedProperties[ memberIndex ] = true;
 
 								var blockExp = ExpressionForPropertyOrField(
 									columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
@@ -353,7 +362,7 @@ namespace FastDataLoader
 							if( allFieldsColumnNames[ memberIndex ] == ReaderNames[ columnIndex ] )
 							{
 								mappedColumns[ columnIndex ] = true;
-								mapperFields[ memberIndex ] = true;
+								mappedFields[ memberIndex ] = true;
 
 								var blockExp = ExpressionForPropertyOrField(
 									columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
@@ -395,9 +404,9 @@ namespace FastDataLoader
 				if( options.ExceptionIfUnmappedFieldOrProperty )
 				{
 					StringBuilder sb = new StringBuilder();
-					for( int i = 0; i < mapperProperties.Length; i++ )
+					for( int i = 0; i < mappedProperties.Length; i++ )
 					{
-						if( !mapperProperties[ i ] )
+						if( !mappedProperties[ i ] )
 						{
 							if( sb.Length > 0 )
 								sb.Append( ", " );
@@ -416,9 +425,9 @@ namespace FastDataLoader
 							$"используйте атрибут [Column(null)]." );
 					}
 
-					for( int i = 0; i < mapperFields.Length; i++ )
+					for( int i = 0; i < mappedFields.Length; i++ )
 					{
-						if( !mapperFields[ i ] )
+						if( !mappedFields[ i ] )
 						{
 							if( sb.Length > 0 )
 								sb.Append( ", " );
@@ -815,6 +824,18 @@ namespace FastDataLoader
 			return Nullable.GetUnderlyingType( type ) != null
 				|| type == typeof( string )
 				|| type == typeof( byte[] );
+		}
+
+		private static bool UseMember( ColumnAttribute attr )
+		{
+			// Если при члене класса не задан атрибут, то член используется в выборке
+			if( attr == null )
+				return true;
+			// Если при члене класса задан атрибут, но маппинг пустой, то член не используется в выборке
+			if( string.IsNullOrWhiteSpace( attr.Name ) )
+				return false;
+			// Если при члене класса задан атрибут, маппинг не пустой, то член используется в выборке
+			return true;
 		}
 	}
 }

@@ -52,5 +52,20 @@ namespace UnitTests
             Assert.AreEqual( TestEnum.Four, value.A );
             Assert.AreEqual( 4, value.B );
         }
+
+        [TestMethod]
+        public void Test3()
+        {
+            using DbReader reader = new DbReader(
+                "select	A = cast( 4 as int )" +
+                "   ,   B = cast( 4 as int )"
+                )
+            ;
+
+            var value = reader.Load1<Tuple<TestEnum, int>>();
+
+            Assert.AreEqual( TestEnum.Four, value.Item1 );
+            Assert.AreEqual( 4, value.Item2 );
+        }
     }
 }
