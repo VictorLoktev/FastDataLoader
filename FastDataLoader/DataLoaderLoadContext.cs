@@ -10,27 +10,19 @@ namespace FastDataLoader
 	/// <see cref="DumpSql"/>Формирует предназначен для выдачу в лог сообщения об ошибке,
 	/// включающем подробности и детали выполняемой команды.
 	/// Если выдача деталей ошибки в лог не требуется, реализаци метода может быть пустой.</para>
-	/// <para><see cref="GetDataReader"/>Должен выполнить команду и вернуть IDataReader с одним или несколькими наборами данных.
-	/// Способы реализации ограничены только двумя условиями:</para>
-	/// <list type="bullet">
-	/// <item>IDataReader, формируемый методом <see cref="GetDataReader"/> должен быть активным до вызова
-	/// метода <see cref="DataLoaderToContext.DisposeContext"/>.</item>
-	/// <item>В случае, если к команде привязан другой активный IDataReader
-	/// (например, не все ранее выбираемые из БД данные прочитаны или не был вызван метод <see cref="DataLoaderToContext.End"/>),
-	/// методом <see cref="GetDataReader"/> должен правильно закрыть прошлый IDataReader и команду,
-	/// затем выполнить новую команду и выдать новый IDataReader.</item>
-	/// </list>
+	/// <para>Методы классов <see cref="DataLoaderLoadContext"/> и <see cref="DataLoaderToContext"/>
+	/// не делают Dispose ни для IDataReader, возвращаемого методом <see cref="GetDataReader"/>,
+	/// ни для команды, выполняющей SQL, к которой привязан IDataReader.
+	/// Поэтому ответственность делать Dispose для IDataReader и команды лежит на коде,
+	/// использующем классы <see cref="DataLoaderLoadContext"/> и <see cref="DataLoaderToContext"/>.</para>
 	/// </summary>
 	[System.Diagnostics.DebuggerNonUserCode()]
 	public abstract class DataLoaderLoadContext
     {
 		/// <summary>
-		/// <para>Вызовом метода <see cref="GetDataReader"/> активирует выполнение команды и чтения данных из БД.</para>
-		/// <para>Формирует контекст для последующих вызовов методов <see cref="DataLoaderToContext.To"/>.</para>
-		/// <para>Применяются опции <see cref="DataLoaderOptions"/> по умолчанию.</para>
-		/// <para>ВАЖНО!</para>
-		/// <para>Последним в цепочки вызовов вида x.Load().To(..).To(..).End()
-		/// обязательно должен быть вызов метода <see cref="DataLoaderToContext.End"/>!</para>
+		/// <para>Данный метод путем вызова <see cref="GetDataReader"/>() активирует выполнение SQL-команды и чтения данных из БД.</para>
+		/// <para>Затем формирует контекст <see cref="DataLoaderToContext"/> для последующих вызовов методов <see cref="DataLoaderToContext.To"/>.</para>
+		/// <para>Параметры чтения данных задаются по умолчанию.</para>
 		/// </summary>
 		/// <returns></returns>
 		public DataLoaderToContext Load()
@@ -39,12 +31,9 @@ namespace FastDataLoader
 		}
 
 		/// <summary>
-		/// <para>Вызовом метода <see cref="GetDataReader"/> активирует выполнение команды и чтения данных из БД.</para>
-		/// <para>Формирует контекст для последующих вызовов методов <see cref="DataLoaderToContext.To"/>.</para>
-		/// <para>Применяются опции <see cref="DataLoaderOptions"/>, заданные в параметре.</para>
-		/// <para>ВАЖНО!</para>
-		/// <para>Последним в цепочки вызовов вида x.Load().To(..).To(..).End()
-		/// обязательно должен быть вызов метода <see cref="DataLoaderToContext.End"/>!</para>
+		/// <para>Данный метод путем вызова <see cref="GetDataReader"/>() активирует выполнение SQL-команды и чтения данных из БД.</para>
+		/// <para>Затем формирует контекст <see cref="DataLoaderToContext"/> для последующих вызовов методов <see cref="DataLoaderToContext.To"/>.</para>
+		/// <para>Параметры чтения данных задаются в параметре <see cref="options"/> данного конструктора.</para>
 		/// </summary>
 		/// <returns></returns>
 		/// <param name="options">Опции работы размещения данных в классах и структурах.</param>
@@ -53,7 +42,7 @@ namespace FastDataLoader
 		{
 			try
 			{
-				return new DataLoaderToContext( GetDataReader(), options );
+				return DataLoaderToContextFabric( GetDataReader(), options );
 			}
 			catch( Exception ex )
 			{
@@ -61,6 +50,19 @@ namespace FastDataLoader
 				throw;
 			}
 		}
+
+		/// <summary>
+		/// Метод перекрывается в случае, если от класса <see cref="DataLoaderToContext"/> надо наследовать другой класс,
+		/// чтобы методы Load и To возвращали отнаследованный от <see cref="DataLoaderToContext"/> класс.
+		/// </summary>
+		/// <param name="reader">Чтение одного или серии выборок из БД.</param>
+		/// <param name="options">Параметры настроек.</param>
+		/// <returns></returns>
+		public virtual DataLoaderToContext DataLoaderToContextFabric( IDataReader reader, DataLoaderOptions options )
+		{
+			return new DataLoaderToContext( GetDataReader(), options );
+		}
+
 
 		public T Load1<T>( string ifNotExactlyOneRecordExceptionMessage = null )
 		{
@@ -95,6 +97,12 @@ namespace FastDataLoader
 		}
 
 		public abstract IDataReader GetDataReader();
+
+		/// <summary>
+		/// <para>Через вызов данного метода осуществляется выдача информации об ошибках при сбоях в методе <see cref="Load"/></para>
+		/// <para>Перекрытие метода позволяет сохранять в логах дополнительную информацию, непоказываемую обычным пользователям.</para>
+		/// </summary>
+		/// <param name="exception">Исключение, произошедшее при работе с SQL</param>
 		public abstract void DumpSql( Exception exception );
 	}
 }

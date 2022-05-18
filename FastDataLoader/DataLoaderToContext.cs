@@ -17,7 +17,6 @@ namespace FastDataLoader
 		/// <summary>
 		/// Данный конструктор предназначен для вызова только из класса <see cref="DataLoaderLoadContext"/>.
 		/// </summary>
-		/// <param name="timer">Инициализированный и запущенный таймер для замера времени выполнения.</param>
 		/// <param name="reader">Чтение одного или серии выборок из БД.</param>
 		/// <param name="options">Параметры настроек.</param>
 		internal DataLoaderToContext( IDataReader reader, DataLoaderOptions options )
@@ -96,25 +95,18 @@ namespace FastDataLoader
 
 		public void End()
 		{
-			try
-			{
-				Timer.Stop();
-				Reader.Dispose();
-				Reader = null;
-				DisposeContext();
-			}
-			catch { }
+			Timer.Stop();
+			/*
+				* Dispose не делается по нескольким причинам:
+				* 1) Dispose может сделать GC в отдельном потоке без влияния на время выполнения основного.
+				* 2) При повторном использовании команды, от которой был получен DataReader,
+				*    ответственность основного кода сделать Dispose перед вызовом Dispose команды.
+				* Reader.Dispose();
+				*/
+			Reader = null;
 		}
 
 		#region Переопределяемый по необходимости методы
-
-		public virtual void DisposeContext()
-		{
-		}
-
-		public virtual void LogWrite( string text )
-		{
-		}
 
 		/// <summary>
 		/// Метод формирует stack trace для записи в лог.
@@ -137,11 +129,10 @@ namespace FastDataLoader
 				//Get the line number from the stack frame
 				int line = frame.GetFileLineNumber();
 
-				if( fileName == null )
-					break;
-
 				if( !string.IsNullOrEmpty( fileName ) )
 					fileName = System.IO.Path.GetFileName( fileName );
+				else
+					fileName = "[External Code]";
 
 				sb.AppendFormat( "{0,-30} => {1}():{2}", fileName, methodName, line );
 				sb.AppendLine();
