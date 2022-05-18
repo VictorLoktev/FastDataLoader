@@ -14,6 +14,10 @@ namespace FastDataLoader
 		{
 			Name = name;
 		}
+
+		/// <summary>
+		/// Name of the DataReader column to be mapped to.
+		/// </summary>
 		public string Name { get; private set; }
 	}
 }

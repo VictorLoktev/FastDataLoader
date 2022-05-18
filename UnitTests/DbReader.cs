@@ -8,6 +8,7 @@ namespace UnitTests
     internal class DbReader : DataLoaderLoadContext, IDisposable
     {
         SqlCommand _Command;
+        SqlDataReader _Reader;
 
         public DbReader( string sql )
         {
@@ -20,12 +21,15 @@ namespace UnitTests
                 command.CommandTimeout = 300;
                 command.CommandText = sql;
                 _Command = command;
+                _Reader = null;
             }
         }
 
         public void Dispose()
         {
             SqlConnection connection = _Command.Connection;
+            _Reader.Close();
+            _Reader = null;
             _Command.Dispose();
             connection.Dispose();
         }
@@ -37,7 +41,8 @@ namespace UnitTests
 
         public override IDataReader GetDataReader()
         {
-            return _Command.ExecuteReader();
+            _Reader = _Command.ExecuteReader();
+            return _Reader;
         }
 
 

@@ -667,7 +667,9 @@ namespace FastDataLoader
 			#endregion
 			#region Если сложный тип, например geometry, ищем статический метод преобразования
 
-			if( !memberType.IsArray && columnType != memberType && !memberType.IsEnum )
+			if( !memberType.IsArray &&
+				!memberType.IsEnum &&
+				( Nullable.GetUnderlyingType( columnType ) ?? columnType ) != ( Nullable.GetUnderlyingType( memberType ) ?? memberType ) )
 			{
 				Expression varCallExp = null;
 				// Если членом класса/структуры является массив, то ищем метод,
