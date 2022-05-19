@@ -6,7 +6,7 @@ using System.Text;
 
 namespace FastDataLoader
 {
-//	[System.Diagnostics.DebuggerNonUserCode()]
+	[System.Diagnostics.DebuggerNonUserCode()]
 	public class DataLoaderToContext
 	{
 		private IDataReader Reader;

@@ -7,6 +7,106 @@ namespace UnitTests
     [TestClass]
     public class SimpleTypes_NumericN
     {
+        class TestClass1
+        {
+            public decimal A;
+            public decimal? B;
+            public decimal C { get; private set; }
+            public decimal? D { get; private set; }
+        }
+
+        [TestMethod]
+        public void Decimal1TestClass1()
+        {
+            using DbReader reader = new DbReader(
+                "select	A = cast( 12345.67000 as numeric(18,8) )" +
+                "   ,   B = cast( 12345.67 as numeric(18,8) )" +
+                "   ,   C = cast( 12345.67 as numeric(18,8) )" +
+                "   ,   D = cast( 12345.67 as numeric(18,8) )"
+                );
+
+            var value = reader
+                .Load1<TestClass1>();
+
+            Assert.AreEqual( 12345.67m, value.A );
+            Assert.AreEqual( 12345.67m, value.B );
+            Assert.AreEqual( 12345.67m, value.C );
+            Assert.AreEqual( 12345.67m, value.D );
+        }
+
+        [TestMethod]
+        public void Decimal2TestClass1()
+        {
+            using DbReader reader = new DbReader(
+                "select	A = cast( 12345.67 as numeric(18,8) )" +
+                "   ,   B = cast( null as numeric(18,8) )" +
+                "   ,   C = cast( 12345.67 as numeric(18,8) )" +
+                "   ,   D = cast( null as numeric(18,8) )"
+                );
+
+            var value = reader
+                .Load1<TestClass1>();
+
+            Assert.AreEqual( 12345.67m, value.A );
+            Assert.AreEqual( null, value.B );
+            Assert.AreEqual( 12345.67m, value.C );
+            Assert.AreEqual( null, value.D );
+        }
+
+        public class TestClass2
+        {
+            public decimal A;
+            public decimal? B;
+            public decimal C { get; private set; }
+            public decimal? D { get; private set; }
+
+            TestClass2( decimal a, decimal? b, decimal c, decimal? d )
+            {
+                A = a;
+                B = b;
+                C = c;
+                D = d;
+            }
+        }
+
+        [TestMethod]
+        public void Decimal1TestClass2()
+        {
+            using DbReader reader = new DbReader(
+                "select	A = cast( 12345.67 as numeric(18,8) )" +
+                "   ,   B = cast( 12345.670000 as numeric(18,8) )" +
+                "   ,   C = cast( 12345.67 as numeric(18,8) )" +
+                "   ,   D = cast( 12345.67 as numeric(18,8) )"
+                );
+
+            var value = reader
+                .Load1<TestClass2>( new DataLoaderOptions() { RemoverTrailingZerosForDecimal = true } );
+
+            Assert.AreEqual( 12345.67m, value.A );
+            Assert.AreEqual( 12345.67m, value.B );
+            Assert.AreEqual( 12345.67m, value.C );
+            Assert.AreEqual( 12345.67m, value.D );
+        }
+
+        [TestMethod]
+        public void Decimal2TestClass2()
+        {
+            using DbReader reader = new DbReader(
+                "select	A = cast( 12345.67 as numeric(18,8) )" +
+                "   ,   B = cast( null as numeric(18,8) )" +
+                "   ,   C = cast( 12345.67 as numeric(18,8) )" +
+                "   ,   D = cast( null as numeric(18,8) )"
+                );
+
+            var value = reader
+                .Load1<TestClass2>();
+
+            Assert.AreEqual( 12345.67m, value.A );
+            Assert.AreEqual( null, value.B );
+            Assert.AreEqual( 12345.67m, value.C );
+            Assert.AreEqual( null, value.D );
+        }
+
         [TestMethod]
         public void DecimalArray1()
         {
@@ -28,7 +128,7 @@ namespace UnitTests
             using DbReader reader = new DbReader(
                 "select	A = cast( 12345.67 as numeric(18,8) )" +
                 " union all " +
-                "select A = cast( 67890.12 as numeric(18,8) )" +
+                "select A = cast( 67890.12000 as numeric(18,8) )" +
                 " union all " +
                 "select A = cast( null as numeric(18,8) )"
                 );
@@ -97,6 +197,7 @@ namespace UnitTests
                 decimal value = reader
                     .Load1<decimal>();
 
+                // ќжидаетс€ 1 строка, приходит 0 - должна быть ошибка
                 Assert.Fail();
             }
             catch( DataLoaderException )
@@ -118,6 +219,7 @@ namespace UnitTests
                 decimal value = reader
                     .Load1<decimal>();
 
+                // ќжидаетс€ 1 строка, приходит две - должна быть ошибка
                 Assert.Fail();
             }
             catch( DataLoaderException )

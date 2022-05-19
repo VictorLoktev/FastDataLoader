@@ -16,7 +16,7 @@ namespace FastDataLoader
 	/// Поэтому ответственность делать Dispose для IDataReader и команды лежит на коде,
 	/// использующем классы <see cref="DataLoaderLoadContext"/> и <see cref="DataLoaderToContext"/>.</para>
 	/// </summary>
-	//[System.Diagnostics.DebuggerNonUserCode()]
+	[System.Diagnostics.DebuggerNonUserCode()]
 	public abstract class DataLoaderLoadContext
     {
 		/// <summary>

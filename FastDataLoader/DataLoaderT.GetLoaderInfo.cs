@@ -184,6 +184,9 @@ namespace FastDataLoader
 				( Nullable.GetUnderlyingType( typeof( T ) ) ?? typeof( T ) )
 				!= ( Nullable.GetUnderlyingType( ReaderTypes[ 0 ] ) ?? ReaderTypes[ 0 ] ) )
 			{
+				Type t1 = ( Nullable.GetUnderlyingType( ReaderTypes[ 0 ] ) ?? ReaderTypes[ 0 ] );
+				Type t2 = typeof( Nullable<> ).MakeGenericType( t1 );
+
 				foreach( MethodInfo mi in typeof( T ).GetMethods( BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static ) )
 				{
 					// Тип, являющийся элементом массива должен иметь статический метод,
@@ -193,7 +196,7 @@ namespace FastDataLoader
 						mi.ReturnType == typeof( T ) &&
 						pi != null &&
 						pi.Length == 1 &&
-						pi[ 0 ].ParameterType == ReaderTypes[ 0 ] )
+						( pi[ 0 ].ParameterType == t1 || pi[ 0 ].ParameterType == t2 ) )
 					{
 						castMethod = mi;
 					}
@@ -247,9 +250,10 @@ namespace FastDataLoader
 			var exps = new List<Expression>();
 			var paramExp = Expression.Parameter( typeof( IDataRecord ), "param" );
 			var targetExp = Expression.Variable( typeof( T ) );
-			//does int based lookup
 			var indexerInfo = typeof( IDataRecord ).GetProperty( "Item", new[] { typeof( int ) } );
 			var invalidParameterExpression = typeof( DataLoaderException ).GetConstructor( new Type[] { typeof( string ) } );
+			MethodInfo decimalDiv = typeof( DataLoader<T> ).GetMethod( nameof( DataLoader<T>.TrimZerosDecimal ) );
+			MethodInfo nullableDecimalDiv = typeof( DataLoader<T> ).GetMethod( nameof( DataLoader<T>.TrimZerosNullableDecimal ) );
 
 			if( directCopy )
 			{
@@ -259,7 +263,8 @@ namespace FastDataLoader
 					0, ReaderTypes[ 0 ], ReaderNames[ 0 ],
 					type, null,
 					paramExp, indexerInfo, invalidParameterExpression,
-					castMethod, options );
+					castMethod, options,
+					nullableDecimalDiv, decimalDiv );
 
 				exps.Add( block );
 
@@ -280,7 +285,8 @@ namespace FastDataLoader
 						columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
 						type, paramInfo[ columnIndex ].Name,
 						paramExp, indexerInfo, invalidParameterExpression,
-						null, options );
+						null, options,
+						nullableDecimalDiv, decimalDiv );
 
 					ctorExps.Add( block );
 				}
@@ -347,10 +353,11 @@ namespace FastDataLoader
 								mappedColumns[ columnIndex ] = true;
 								mappedProperties[ memberIndex ] = true;
 
-								var blockExp = ExpressionForPropertyOrField(
+								var blockExp = PrepareExpression(
 									columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
 									member.PropertyType, member.Name,
-									paramExp, targetExp, indexerInfo, invalidParameterExpression, options );
+									paramExp, targetExp, indexerInfo, invalidParameterExpression, options,
+									nullableDecimalDiv, decimalDiv );
 								exps.Add( blockExp );
 								break;
 							}
@@ -364,10 +371,11 @@ namespace FastDataLoader
 								mappedColumns[ columnIndex ] = true;
 								mappedFields[ memberIndex ] = true;
 
-								var blockExp = ExpressionForPropertyOrField(
+								var blockExp = PrepareExpression(
 									columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
 									member.FieldType, member.Name,
-									paramExp, targetExp, indexerInfo, invalidParameterExpression, options );
+									paramExp, targetExp, indexerInfo, invalidParameterExpression, options,
+									nullableDecimalDiv, decimalDiv );
 								exps.Add( blockExp );
 								break;
 							}
@@ -464,168 +472,127 @@ namespace FastDataLoader
 		private static Expression ExpressionForConstructor( int columnIndex,
 			Type columnType, string columnName, Type argType, string argName,
 			Expression paramExp, PropertyInfo indexerInfo, ConstructorInfo invalidParameterExpression,
-			MethodInfo castMethod, DataLoaderOptions options )
+			MethodInfo castMethod, DataLoaderOptions options,
+			MethodInfo nullableDecimalDiv, MethodInfo decimalDiv )
 		{
-			// if it is NOT a reference type
-			if( argType.IsClass == false &&
-				argType.IsInterface == false )
-			{
-				var varExp = Expression.Variable( typeof( object ), "SQL_Column_" + columnName );
-				var condDefaultExp = Expression.Condition(
-						Expression.Equal( varExp, Expression.Constant( DBNull.Value ) ),
-						Expression.Default( argType ),
-						argType.IsValueType
-							? Expression.Unbox( varExp, argType )
-							: Expression.Convert( varExp, argType )
-					);
-
-				var nullCheckExp = IsNullable( argType )
-					? (Expression)condDefaultExp
-					: Expression.Block(
-							Expression.IfThen(
-							Expression.Equal(
-								varExp,
-								Expression.Constant( DBNull.Value )
-							),
-							Expression.Throw(
-								Expression.New( invalidParameterExpression,
-								Expression.Constant(
-									$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
-									( argName != null
-									? $"параметр конструктора '{argName}' с типом "
-									: $"тип "
-									) +
-									$"'{GetCSharpTypeName( argType )}' не может " +
-									$"принять null из колонки '{columnName}'" ) )
-								)
-							),
-							condDefaultExp
-						);
-
-				if( options.RemoverTrailingZerosForDecimal && argType == typeof( decimal ) )
-				{
-					// Если тип decimal и включена опция отсечения незначащих нулей в конце
-					nullCheckExp = Expression.Divide(
-						nullCheckExp,
-						Expression.Constant( 1.000000000000000000000000000000000m )
-						);
-				}
-
-				var indexerExp = castMethod != null
-					? Expression.Assign( varExp,
-							Expression.Call( castMethod,
-								Expression.Convert( Expression.MakeIndex( paramExp, indexerInfo, new[] { Expression.Constant( columnIndex ) } ), columnType )
-							)
-						)
-					: Expression.Assign( varExp,
-							Expression.MakeIndex( paramExp, indexerInfo, new[] { Expression.Constant( columnIndex ) } )
-						);
-
-				var block = Expression.TryCatch(
-					Expression.Block(
-						new[] { varExp },
-						indexerExp,
-						nullCheckExp
-					),
-					Expression.Catch(
-						typeof( InvalidCastException ),
-						Expression.Block(
-							Expression.Throw(
-								Expression.New( typeof( DataLoaderException ).GetConstructor( new Type[] { typeof( string ) } ),
-								Expression.Constant(
-									$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
-									$"для колонки '{columnName}' не возможно преобразовать " +
-									$"из типа '{GetCSharpTypeName( columnType )}' " +
-									$"в тип '{GetCSharpTypeName( argType )}'" )
-								)
-							),
-							// Это ничего не значащий Expression, просто надо что-то вернуть, иначе при компиляции ошибка
-							Expression.Default( argType )
-						)
-					)
+			Expression errExp = Expression.Constant(
+				// if it is NOT a reference type
+				argType.IsClass == false && argType.IsInterface == false
+				? $"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
+					( argName != null
+					? $"параметр конструктора '{argName}' с типом "
+					: $"тип "
+					) +
+					$"'{GetCSharpTypeName( argType )}' не может " +
+					$"принять null из колонки '{columnName}'"
+				: $"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
+					$"для колонки '{columnName}' не возможно преобразовать " +
+					$"из типа '{GetCSharpTypeName( columnType )}' " +
+					$"в тип '{GetCSharpTypeName( argType )}'"
 				);
 
-				return block;
-			}
-			else
-			{
-				var varExp = Expression.Variable( typeof( object ), "SQL_Column_" + columnName );
+			var untypedVariable = Expression.Variable( typeof( object ), columnName + "_untyped" );
+			var typedVariable = Expression.Variable( argType, columnName + "_typed" );
 
-				var assignExp =
-					Expression.Assign( varExp,
-						Expression.MakeIndex( paramExp, indexerInfo, new[] { Expression.Constant( columnIndex ) } ) );
-
-				if( options.RemoverTrailingZerosForDecimal && argType == typeof( decimal ) )
-				{
-					// Если тип decimal и включена опция отсечения незначащих нулей в конце
-					assignExp = Expression.Divide(
-						assignExp,
-						Expression.Constant( 1.000000000000000000000000000000000m )
-						);
-				}
-
-				var block = Expression.TryCatch(
-					Expression.Block(
-						new[] { varExp },
-						assignExp,
-						Expression.Condition(
-							Expression.Equal( varExp, Expression.Constant( DBNull.Value ) ),
-							Expression.Default( argType ),
-							Expression.Convert( varExp, argType )
-						)
-					),
-					Expression.Catch(
-						typeof( InvalidCastException ),
-						Expression.Block(
-							Expression.Throw(
-								Expression.New( typeof( DataLoaderException ).GetConstructor( new Type[] { typeof( string ) } ),
-								Expression.Constant(
-									$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
-									$"для колонки '{columnName}' не возможно преобразовать " +
-									$"из типа '{GetCSharpTypeName( columnType )}' " +
-									$"в тип '{GetCSharpTypeName( argType )}'" )
-								)
-							),
-							// Это ничего не значащий Expression.Constant, просто надо что-то вернуть, иначе при компиляции ошибка
-							Expression.Default( argType )
-						)
-					)
-				);
-				return block;
-			}
-		}
-
-		private static Expression ExpressionForPropertyOrField( int columnIndex,
-			Type columnType, string columnName, Type memberType, string memberName,
-			Expression paramExp, Expression targetExp, PropertyInfo indexerInfo,
-			ConstructorInfo invalidParameterExpression, DataLoaderOptions options )
-		{
-			var columnIndexExp = Expression.Constant( columnIndex );
-			var indexerExp = Expression.MakeIndex( paramExp, indexerInfo, new[] { columnIndexExp } );
-			var varExp = Expression.Variable( typeof( object ), memberName );
-			Expression block;
-
-			Expression sourceWithNullCheckExp =
-				Expression.Condition(
-					Expression.Equal( varExp, Expression.Constant( DBNull.Value ) ),
-					Expression.Default( columnType ),
-					Expression.Convert( varExp, columnType )
-				);
-
-			if( options.RemoverTrailingZerosForDecimal && columnType == typeof( decimal ) )
+			Expression argTypedValue = typedVariable;
+			if( options.RemoverTrailingZerosForDecimal )
 			{
 				// Если тип decimal и включена опция отсечения незначащих нулей в конце
-				sourceWithNullCheckExp = Expression.Divide(
-					sourceWithNullCheckExp,
-					Expression.Constant( 1.000000000000000000000000000000000m )
-					);
+				if( argType == typeof( decimal ) )
+				{
+					// Так делать нельзя, т.к. в некоторых проектах такое не срабатывает, не понятно почему, см. комментарий при методе TrimZerosDecimal
+					// !! argTypedValue = Expression.Divide( typedVariable, Expression.Constant( 1.000000000000000000000000000000000m ) );
+					argTypedValue = Expression.Call( decimalDiv, typedVariable );
+				}
+				else
+				if( argType == typeof( decimal? ) )
+				{
+					// Так делать нельзя, т.к. в некоторых проектах такое не срабатывает, не понятно почему, см. комментарий при методе TrimZerosDecimal
+					// !! argTypedValue = Expression.Convert(
+					// Expression.Divide(
+					//					Expression.Property( typedVariable, "Value" ),
+					//					Expression.Constant( 1.000000000000000000000000000000000m )
+					//				), argType );
+					argTypedValue = Expression.Call( nullableDecimalDiv, typedVariable );
+				}
 			}
+
+			Expression returnExp;
+			if( castMethod != null )
+				returnExp = Expression.Block( Expression.Call( castMethod, argTypedValue ) );
+			else
+				returnExp = Expression.Block( argTypedValue );
+
+			Expression block = Expression.Block(
+				new[] { untypedVariable, typedVariable },
+				Expression.Assign(
+					untypedVariable,
+					Expression.MakeIndex( paramExp, indexerInfo, new[] { Expression.Constant( columnIndex ) } )
+					),
+				Expression.IfThenElse(
+					Expression.Equal(
+						untypedVariable,
+						Expression.Constant( DBNull.Value )
+					),
+					IsNullable( argType ) || argType.IsClass == true || argType.IsInterface == true
+					? (Expression)Expression.Assign( typedVariable, Expression.Default( argType ) )
+					: (Expression)Expression.Throw( Expression.New( invalidParameterExpression, errExp ) ),
+					Expression.Block(
+						Expression.Assign( typedVariable,
+								argType.IsValueType && argType.IsClass == false && argType.IsInterface == false
+								? Expression.Unbox( untypedVariable, argType )
+								: Expression.Convert( untypedVariable, argType )
+						),
+						Expression.Assign( typedVariable, returnExp )
+					)
+				),
+				typedVariable
+			);
+
+			Expression result = Expression.TryCatch(
+				block,
+				Expression.Catch(
+					typeof( InvalidCastException ),
+					Expression.Block(
+						Expression.Throw(
+							Expression.New( invalidParameterExpression,
+							Expression.Constant(
+								$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
+								$"для колонки '{columnName}' не возможно преобразовать " +
+								$"из типа '{GetCSharpTypeName( columnType )}' " +
+								$"в тип '{GetCSharpTypeName( argType )}'" )
+							)
+						),
+						// Это ничего не значащий Expression, просто надо что-то вернуть, иначе при компиляции ошибка
+						Expression.Default( argType )
+					)
+				)
+			);
+
+			return result;
+		}
+
+		private static Expression PrepareExpression( int columnIndex,
+			Type columnType, string columnName, Type memberType, string memberName,
+			Expression paramExp, Expression targetExp, PropertyInfo indexerInfo,
+			ConstructorInfo invalidParameterExpression, DataLoaderOptions options,
+			MethodInfo nullableDecimalDiv, MethodInfo decimalDiv )
+		{
+			Type argType = memberType;
+			Expression errExp = Expression.Constant(
+				$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
+				$"поле или свойство '{memberName}', " +
+				$"имеющее тип '{GetCSharpTypeName( memberType )}', не может " +
+				$"принять null из колонки '{columnName}'" );
+
+
+			MethodInfo stringToArrayMethod = null;
+			MethodInfo typeConvertMethod = null;
 
 			#region Если массив и есть метод преобразования из string в массив нужного типа
 
 			if( memberType.IsArray && columnType == typeof( string ) )
 			{
-				Expression varCallExp = null;
 				// Если членом класса/структуры является массив, то ищем метод,
 				// принимающий xml в параметре типа string и возвращающий массив элементов типа, как у члена
 				Type elementOfArrayType = memberType.GetElementType();
@@ -641,26 +608,26 @@ namespace FastDataLoader
 						pi.Length == 1 &&
 						pi[ 0 ].ParameterType == columnType )
 					{
-						// Если метод преобразования типа найден, делается замена varNullCheckExp со встраиванием вызова
-						varCallExp = Expression.Call( mi, sourceWithNullCheckExp );
+						stringToArrayMethod = mi;
 					}
 				}
-				if( varCallExp == null )
+				if( stringToArrayMethod == null )
 				{
-					throw new DataLoaderException( $"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
-						$"поле или свойство '{memberName}' имеет тип {memberType.Name}, " +
-						$"но в типе {memberType.GetElementType().Name} отсутствует метод " +
+					throw new DataLoaderException(
+						$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
+						$"поле или свойство '{memberName}' имеет тип {GetCSharpTypeName( memberType )}, " +
+						$"но в типе {GetCSharpTypeName( memberType.GetElementType() )} отсутствует метод " +
 						$"private|public static {memberType.Name} AnyNameYouLike(string anyParamName), " +
 						$"который должен пробразовывать из строки xml в массив элементов." );
 				}
 
-				block =
-					Expression.Block(
-							new[] { varExp },
-							Expression.Assign( varExp, indexerExp ),
-							Expression.Assign( Expression.PropertyOrField( targetExp, memberName ), varCallExp )
-						);
-
+				argType = typeof( string );
+				errExp = Expression.Constant(
+					$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
+					$"метод {memberType.Name}, преобразующий из строки, содержащей xml, " +
+					$"в массив типов {GetCSharpTypeName( memberType.GetElementType() )} " +
+					$"для поля или свойства '{memberName}', не может " +
+					$"принять null из колонки '{columnName}'" );
 			}
 			else
 
@@ -671,7 +638,9 @@ namespace FastDataLoader
 				!memberType.IsEnum &&
 				( Nullable.GetUnderlyingType( columnType ) ?? columnType ) != ( Nullable.GetUnderlyingType( memberType ) ?? memberType ) )
 			{
-				Expression varCallExp = null;
+				Type t1 = ( Nullable.GetUnderlyingType( columnType ) ?? columnType );
+				Type t2 = typeof( Nullable<> ).MakeGenericType( t1 );
+
 				// Если членом класса/структуры является массив, то ищем метод,
 				// принимающий xml в параметре типа string и возвращающий массив элементов типа, как у члена
 				foreach( MethodInfo mi in memberType.GetMethods( BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static ) )
@@ -682,88 +651,95 @@ namespace FastDataLoader
 					if( mi.IsStatic &&
 						mi.ReturnType == memberType &&
 						pi != null &&
-						pi.Length == 1 &&
-						pi[ 0 ].ParameterType == columnType )
+						pi.Length == 1 )
 					{
-						// Если метод преобразования типа найден, делается замена varNullCheckExp со встраиванием вызова
-						varCallExp = Expression.Call( mi, sourceWithNullCheckExp );
+						if( pi[ 0 ].ParameterType == t1 )
+							argType = t1;
+						else
+						if( pi[ 0 ].ParameterType == t2 )
+							argType = t2;
+						else
+							continue;
+						typeConvertMethod = mi;
 					}
 				}
-				if( varCallExp == null )
+				if( typeConvertMethod == null )
 				{
 					throw new DataLoaderException( $"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
-						$"поле или свойство '{memberName}' имеет тип {memberType.Name}, " +
+						$"поле или свойство '{memberName}' имеет тип {GetCSharpTypeName( memberType )}, " +
 						$"но в типе {memberType.Name} отсутствует метод " +
 						$"private|public static {memberType.Name} AnyNameYouLike({columnType} anyParamName), " +
 						$"который должен делать преобразование типа." );
 				}
-
-				block =
-					Expression.Block(
-							new[] { varExp },
-							Expression.Assign( varExp, indexerExp ),
-							Expression.Assign( Expression.PropertyOrField( targetExp, memberName ), varCallExp )
-						);
-
+				errExp = Expression.Constant(
+					$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
+					$"метод {memberType.Name}, преобразующий из строки, содержащей xml, " +
+					$"в массив типов {GetCSharpTypeName( memberType.GetElementType() )} " +
+					$"для поля или свойства '{memberName}', не может " +
+					$"принять null из колонки '{columnName}'" );
 			}
-			else
 
 			#endregion
+
+			var untypedVariable = Expression.Variable( typeof( object ), memberName + "_untyped" );
+			var typedVariable = Expression.Variable( argType, memberName + "_typed" );
+
+			Expression argTypedValue = typedVariable;
+			if( options.RemoverTrailingZerosForDecimal )
 			{
-				/*
-				 * Если есть метод преобразования из string в тип члена класса (выше),
-				 * то ничего дополнительно не нужно,
-				 * но если метода нет, то надо делать проверку на null
-				 */
-
-				Expression unboxOrConvertExp =
-					memberType.IsValueType
-						? Expression.Unbox( varExp, memberType )
-						: Expression.Convert( varExp, memberType );
-
-				if( options.RemoverTrailingZerosForDecimal && columnType == typeof( decimal ) )
+				// Если тип decimal и включена опция отсечения незначащих нулей в конце
+				if( argType == typeof( decimal ) )
 				{
-					// Если тип decimal и включена опция отсечения незначащих нулей в конце
-					unboxOrConvertExp = Expression.Divide(
-						unboxOrConvertExp,
-						Expression.Constant( 1.000000000000000000000000000000000m )
-						);
+					// Так делать нельзя, т.к. в некоторых проектах такое не срабатывает, не понятно почему, см. комментарий при методе TrimZerosDecimal
+					// !! argTypedValue = Expression.Divide( typedVariable, Expression.Constant( 1.000000000000000000000000000000000m ) );
+					argTypedValue = Expression.Call( decimalDiv, typedVariable );
 				}
-
-
-				if( IsNullable( memberType ) )
-					block = Expression.Block(
-						new[] { varExp },
-						Expression.Assign( varExp, indexerExp ),
-						Expression.Assign( Expression.PropertyOrField( targetExp, memberName ),
-							Expression.Condition(
-								Expression.Equal( varExp, Expression.Constant( DBNull.Value ) ),
-								Expression.Default( memberType ),
-								unboxOrConvertExp
-							)
-						)
-					);
 				else
-					block = Expression.Block(
-						new[] { varExp },
-						Expression.Assign( varExp, indexerExp ),
-						Expression.IfThen(
-							Expression.Equal(
-								varExp,
-								Expression.Constant( DBNull.Value )
-							),
-							Expression.Throw(
-								Expression.New( invalidParameterExpression,
-								Expression.Constant(
-									$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
-									$"field '{memberName}' " +
-									$"с типом '{GetCSharpTypeName( memberType )}' не может " +
-									$"принять null из колонки '{columnName}'" ) )
-								)
-							),
-						Expression.Assign( Expression.PropertyOrField( targetExp, memberName ), unboxOrConvertExp )
-					);
+				if( argType == typeof( decimal? ) )
+				{
+					// Так делать нельзя, т.к. в некоторых проектах такое не срабатывает, не понятно почему, см. комментарий при методе TrimZerosDecimal
+					// !! argTypedValue = Expression.Convert(
+					// Expression.Divide(
+					//					Expression.Property( typedVariable, "Value" ),
+					//					Expression.Constant( 1.000000000000000000000000000000000m )
+					//				), argType );
+					argTypedValue = Expression.Call( nullableDecimalDiv, typedVariable );
+				}
 			}
+
+            Expression assign;
+			if( stringToArrayMethod != null )
+				assign = Expression.Assign( Expression.PropertyOrField( targetExp, memberName ), Expression.Call( stringToArrayMethod, argTypedValue ) );
+			else
+			if( typeConvertMethod != null )
+				assign = Expression.Assign( Expression.PropertyOrField( targetExp, memberName ), Expression.Call( typeConvertMethod, argTypedValue ) );
+			else
+				assign = Expression.Assign( Expression.PropertyOrField( targetExp, memberName ), argTypedValue );
+
+			Expression block = Expression.Block(
+				new[] { untypedVariable, typedVariable },
+				Expression.Assign(
+					untypedVariable,
+					Expression.MakeIndex( paramExp, indexerInfo, new[] { Expression.Constant( columnIndex ) } )
+					),
+				Expression.IfThenElse(
+					Expression.Equal(
+						untypedVariable,
+						Expression.Constant( DBNull.Value )
+					),
+					IsNullable( argType )
+					? Expression.Assign( Expression.PropertyOrField( targetExp, memberName ), Expression.Default( memberType ) )
+					: (Expression)Expression.Throw( Expression.New( invalidParameterExpression, errExp ) ),
+					Expression.Block(
+						Expression.Assign( typedVariable,
+								argType.IsValueType
+								? Expression.Unbox( untypedVariable, argType )
+								: Expression.Convert( untypedVariable, argType )
+						),
+						assign
+					)
+				)
+			);
 
 			var exp = Expression.TryCatch(
 				block,
@@ -776,16 +752,35 @@ namespace FastDataLoader
 								$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 								$"значение типа '{GetCSharpTypeName( columnType )}' " +
 								$"из колонки '{columnName}' не возможно преобразовать " +
-								$"в тип '{GetCSharpTypeName( memberType )}' поля или свойства '{memberType.Name}'" )
+								$"в тип '{GetCSharpTypeName( memberType )}' поля или свойства '{memberName}'" )
 							)
-						),
-						// Это ничего не значащий Expression, просто надо что - то вернуть, иначе при компиляции ошибка
-						Expression.Default( memberType )
+						)
 					)
 				)
 			);
 
 			return exp;
+		}
+
+		/*
+		 * По хорошему надо встроить в дерево формируемого Expression вот такую часть
+		 * Expression.Divide( typedVariable, Expression.Constant( 1.000000000000000000000000000000000m ) ),
+		 * но к сожалению, в некоторых случаях обрезание нулей подобным образом не срабатывает.
+		 * В тестовых методах данного проекта срабатывает, а на других проектах с reference на данную библотеку - нет.
+		 * Поэтому вместо Expression.Divide в Expression встраивается вызов данного метода для деления на 1.000000000000000000000000000000000m.
+		 * И в проекте, где не работает, вроде начинает работать правильно.
+		 */
+		public static decimal TrimZerosDecimal( decimal a )
+		{
+			return a / 1.000000000000000000000000000000000m;
+		}
+
+		// См. комментарий к методу TrimZerosDecimal
+		public static decimal? TrimZerosNullableDecimal( decimal? a )
+		{
+			if( a.HasValue )
+				return a.Value / 1.000000000000000000000000000000000m;
+			return null;
 		}
 
 		/// <summary>

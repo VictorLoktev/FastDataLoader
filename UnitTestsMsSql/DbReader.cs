@@ -11,7 +11,7 @@ namespace UnitTests
 
         public DbReader( string sql )
         {
-            SqlConnection connection = new SqlConnection( "Data Source=127.0.0.1;Initial Catalog=master;Integrated Security=True" );
+            SqlConnection connection = new SqlConnection( "Data Source=127.0.0.1;Initial Catalog=Mineral.MF.LegacyApp;Integrated Security=True" );
             connection.Open();
 
             using( SqlCommand command = new SqlCommand() )
