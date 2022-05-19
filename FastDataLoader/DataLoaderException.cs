@@ -3,21 +3,21 @@ using System.Runtime.Serialization;
 
 namespace FastDataLoader
 {
-    public class DataLoaderException : Exception
+    public class FastDataLoaderException : Exception
     {
-        public DataLoaderException()
+        public FastDataLoaderException()
         {
         }
 
-        public DataLoaderException( string message ) : base( message )
+        public FastDataLoaderException( string message ) : base( message )
         {
         }
 
-        public DataLoaderException( string message, Exception innerException ) : base( message, innerException )
+        public FastDataLoaderException( string message, Exception innerException ) : base( message, innerException )
         {
         }
 
-        protected DataLoaderException( SerializationInfo info, StreamingContext context ) : base( info, context )
+        protected FastDataLoaderException( SerializationInfo info, StreamingContext context ) : base( info, context )
         {
         }
     }

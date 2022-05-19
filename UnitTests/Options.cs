@@ -7,28 +7,32 @@ namespace UnitTests
     [TestClass]
     public class OptionTest
     {
+        // Disable warning IDE0044 'Make field readonly' in code or in project
+#pragma warning disable IDE0044 // Add readonly modifier
         public class Test1
         {
             private int A;
 
             public int AResult => A;
         }
+#pragma warning restore IDE0044 // Add readonly modifier
 
+        // Disable warning IDE0044 'Make field readonly' in code or in project
+#pragma warning disable IDE0044 // Add readonly modifier
         public class Test2
         {
             private int A;
 
             public int AResult => A;
-
-            private int Field;
         }
+#pragma warning restore IDE0044 // Add readonly modifier
 
         [TestMethod]
         public void FailTest()
         {
             try
             {
-                using DbReader reader = new DbReader(
+                using DbReader reader = new(
                     "select	A = cast( 12345 as int )" +
                     "   ,   B = cast( '12345' as varchar(100) )" +
                     "   ,   C = cast( 1 as bit )"
@@ -41,7 +45,7 @@ namespace UnitTests
                 // Columns B and C are not mapped to class members
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }
@@ -49,7 +53,7 @@ namespace UnitTests
         [TestMethod]
         public void IgnoreColumns()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int )" +
                 "   ,   B = cast( '12345' as varchar(100) )" +
                 "   ,   C = cast( 1 as bit )"
@@ -64,7 +68,7 @@ namespace UnitTests
         [TestMethod]
         public void UnmappedReaderColumn()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int )" +
                 "   ,   B = cast( '12345' as varchar(100) )" +
                 "   ,   C = cast( 1 as bit )"
@@ -79,7 +83,7 @@ namespace UnitTests
         [TestMethod]
         public void UnmappedFieldOrProperty()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int )"
                 );
             reader

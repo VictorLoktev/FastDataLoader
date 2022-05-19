@@ -25,13 +25,18 @@ namespace UnitTests
             public string B2 { get; set; }
         }
 
+        // Disable warning IDE0044 'Make field readonly' in code or in project, otherwise use properties
+#pragma warning disable IDE0044 // Add readonly modifier
         private class Test2
         {
             private int A;
 
             public int AResult => A;
         }
+#pragma warning restore IDE0044 // Add readonly modifier
 
+        // Disable warning IDE0044 'Make field readonly' in code or in project, otherwise use properties
+#pragma warning disable IDE0044 // Add readonly modifier
         private class Test3
         {
             private int A;
@@ -40,14 +45,25 @@ namespace UnitTests
 
             private string B;
 
+            public string GetValueOfB()
+            {
+                return B;
+            }
+
             // The constrcutor is used to initialize instances
             // Important! Constructor arguments must be in order of result columns!
+            // You should ignore warning: Message IDE0051 Private member 'Test3..ctor' is unused UnitTests
+#pragma warning disable IDE0051 // Remove unused private members
             private Test3( int a, string b )
+#pragma warning restore IDE0051 // Remove unused private members
             {
                 A = a;
                 B = b;
             }
         }
+#pragma warning restore IDE0044 // Add readonly modifier
+
+
         public class Test4
         {
             // Map to column A
@@ -59,7 +75,7 @@ namespace UnitTests
         [TestMethod]
         public void Load1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int )" +
                 "   ,   B = cast( '12345' as varchar(100) )"
                 );
@@ -76,7 +92,7 @@ namespace UnitTests
         [TestMethod]
         public void Load2()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int )"
                 );
             reader
@@ -90,7 +106,7 @@ namespace UnitTests
         [TestMethod]
         public void LoadConstructor()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int )" +
                 "   ,   B = cast( '12345' as varchar(100) )"
                 );
@@ -101,12 +117,14 @@ namespace UnitTests
 
             // Here the constructor is used to initialize the instance
             Assert.AreEqual( 12345, data.AResult );
+            // Field B is private, use method to check it's value
+            Assert.AreEqual( "12345", data.GetValueOfB() );
         }
 
         [TestMethod]
         public void Load4()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int )" +
                 "   ,   B = cast( 12345 as int )"
                 );
@@ -121,7 +139,7 @@ namespace UnitTests
         [TestMethod]
         public void Load5()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( null as int )" +
                 "   ,   B = cast( 12345 as int )"
                 );
@@ -136,7 +154,7 @@ namespace UnitTests
         [TestMethod]
         public void Load6()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345  as int )" +
                 "   ,   B = cast( null as int )"
                 );

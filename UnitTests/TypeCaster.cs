@@ -19,10 +19,15 @@ namespace UnitTests
         {
             public string NumberStr { get; private set; }
 
+            // Supress warning IDE0051 Private member 'PhoneType.MyMethodForCastingFromLongToPhoneType' is unused UnitTests in code or in project
+#pragma warning disable IDE0051 // Remove unused private members
             private static PhoneType MyMethodForCastingFromLongToPhoneType( long number )
+#pragma warning restore IDE0051 // Remove unused private members
             {
-                PhoneType item = new PhoneType();
-                item.NumberStr = number.ToString();
+                PhoneType item = new()
+                {
+                    NumberStr = number.ToString()
+                };
                 return item;
             }
         }
@@ -37,7 +42,7 @@ namespace UnitTests
         [TestMethod]
         public void LoadArray()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	Name = 'John'" +
                 "   ,   Phone = cast(1234567890 as bigint)"
                 );

@@ -29,7 +29,7 @@ namespace UnitTests
         [TestMethod]
         public void Test1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 4 as int )"
                 );
 
@@ -41,7 +41,7 @@ namespace UnitTests
         [TestMethod]
         public void Test2()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 4 as int )" +
                 "   ,   B = cast( 4 as int )"
                 )
@@ -56,7 +56,7 @@ namespace UnitTests
         [TestMethod]
         public void Test3()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 4 as int )" +
                 "   ,   B = cast( 4 as int )"
                 )

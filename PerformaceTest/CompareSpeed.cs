@@ -21,36 +21,34 @@ namespace PerformaceTest
 		public static void Run( int n )
 		{
 			Console.WriteLine( $"CompareSpeed: read 1'000'000 times top {n} records" );
-			using SqlConnection connection = new SqlConnection( "Data Source=localhost;Initial Catalog=master;Integrated Security=True" );
+			using SqlConnection connection = new( "Data Source=localhost;Initial Catalog=master;Integrated Security=True" );
 			connection.Open();
 
 			// Let's give all other programs to finish CPU and disk operations
 			System.Threading.Thread.Sleep( 5000 );
 
-			Stopwatch innerTimer = new Stopwatch();
-			Stopwatch outerTimer = new Stopwatch();
+			Stopwatch innerTimer = new();
+			Stopwatch outerTimer = new();
 
 			outerTimer.Start();
 			for( int i = 0; i < 1_000_000; i++ )
 			{
-				using( SqlCommand cmd = new SqlCommand() )
-				{
-					InitCommand( connection, cmd, n );
+                using SqlCommand cmd = new();
+                InitCommand( connection, cmd, n );
 
-					TestReader reader = new TestReader( cmd );
-					var context = reader.Load();
+                TestReader reader = new( cmd );
+                var context = reader.Load();
 
-					// Here we have DataReader full of data from executed command
+                // Here we have DataReader full of data from executed command
 
-					innerTimer.Start();
-					context
-						.To( out Record[] ids );
-					innerTimer.Stop();
+                innerTimer.Start();
+                context
+                    .To( out Record[] ids );
+                innerTimer.Stop();
 
-					// End disposes reader of sql command
-					context.End();
-				}
-			}
+                // End disposes reader of sql command
+                context.End();
+            }
 			outerTimer.Stop();
 
 			Console.WriteLine( $"Using DataLoader: Inner timer: {innerTimer.Elapsed}. Outer timer: {outerTimer.Elapsed}." );
@@ -61,29 +59,29 @@ namespace PerformaceTest
 			outerTimer.Start();
 			for( int i = 0; i < 1_000_000; i++ )
 			{
-				using( SqlCommand cmd = new SqlCommand() )
-				{
-					InitCommand( connection, cmd, n );
+                using SqlCommand cmd = new();
+                InitCommand( connection, cmd, n );
 
-					IDataReader reader = new TestReader( cmd ).GetDataReader();
+                IDataReader reader = new TestReader( cmd ).GetDataReader();
 
-					// Here we have DataReader full of data from executed command
+                // Here we have DataReader full of data from executed command
 
-					List<Record> list = new List<Record>();
+                List<Record> list = new();
 
-					innerTimer.Start();
-					while( reader.Read() )
-					{
-						Record item = new Record();
-						item.Id = reader.GetInt32( reader.GetOrdinal( "object_id" ) );
-						item.Text = reader.GetString( reader.GetOrdinal( "TextData" ) );
+                innerTimer.Start();
+                while( reader.Read() )
+                {
+                    Record item = new()
+                    {
+                        Id = reader.GetInt32( reader.GetOrdinal( "object_id" ) ),
+                        Text = reader.GetString( reader.GetOrdinal( "TextData" ) )
+                    };
 
-						list.Add( item );
-					};
-					innerTimer.Stop();
+                    list.Add( item );
+                };
+                innerTimer.Stop();
 
-					reader.Dispose();
-				}
+                reader.Dispose();
             }
             outerTimer.Stop();
 

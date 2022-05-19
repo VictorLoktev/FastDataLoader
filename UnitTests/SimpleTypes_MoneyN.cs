@@ -10,7 +10,7 @@ namespace UnitTests
         [TestMethod]
         public void DecimalArray1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345.67 as money )"
                 );
             reader
@@ -25,7 +25,7 @@ namespace UnitTests
         [TestMethod]
         public void DecimalArray2()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345.67 as money )" +
                 " union all " +
                 "select A = cast( 67890.12 as money )" +
@@ -46,7 +46,7 @@ namespace UnitTests
         [TestMethod]
         public void DecimalArray0()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345.67 as money ) " +
                 "where 1=0"
                 );
@@ -61,7 +61,7 @@ namespace UnitTests
         [TestMethod]
         public void Decimal1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345.67 as money )"
                 );
 
@@ -74,7 +74,7 @@ namespace UnitTests
         [TestMethod]
         public void Decimal12()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( null as money )"
                 );
 
@@ -87,7 +87,7 @@ namespace UnitTests
         [TestMethod]
         public void DecimalError0()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as money ) " +
                 "where 1=0"
                 );
@@ -99,7 +99,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }
@@ -107,7 +107,7 @@ namespace UnitTests
         [TestMethod]
         public void DecimalError2()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as money )" +
                 " union all " +
                 "select	A = cast( 12345 as money )"
@@ -120,7 +120,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }

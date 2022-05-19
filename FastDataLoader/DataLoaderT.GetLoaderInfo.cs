@@ -18,8 +18,8 @@ namespace FastDataLoader
 			public Func<IDataReader, T> Initializer;
 		}
 
-		private static SortedDictionary<string, LoaderInfo> LoaderDictionary = new SortedDictionary<string, LoaderInfo>();
-		private static SemaphoreSlim Sema = new SemaphoreSlim( 1, 1 );
+		private static readonly SortedDictionary<string, LoaderInfo> LoaderDictionary = new SortedDictionary<string, LoaderInfo>();
+		private static readonly SemaphoreSlim Sema = new SemaphoreSlim( 1, 1 );
 
 		private static LoaderInfo GetLoaderInfo( IDataReader reader, DataLoaderOptions options )
 		{
@@ -82,7 +82,11 @@ namespace FastDataLoader
 			FieldInfo[] allFields = typeof( T )
 				.GetFields( BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance )
 				.Where( x => UseMember( x.GetCustomAttributes<ColumnAttribute>().FirstOrDefault() ) )
-				.Where( x => !x.Name.Contains( "BackingField" ) )   // Поля автосгенерированный из свойств
+				//-------
+				// Поля автосгенерированный из свойств
+				//.Where( x => !x.Name.Contains( "BackingField" ) )
+				.Where( f => f.GetCustomAttribute<System.Runtime.CompilerServices.CompilerGeneratedAttribute>() == null )
+				//-------
 				.ToArray();
 
 			// Названия колонок могут быть либо такими же, как название члена класса или структуры, либо задаваться атрибутом Column
@@ -102,7 +106,9 @@ namespace FastDataLoader
 					}
 				}
 				else
+				{
 					allPropertiesColumnNames[ i ] = property.Name;
+				}
 			}
 			string[] allFieldsColumnNames = new string[ allFields.Length ];
 			for( int i = 0; i < allFields.Length; i++ )
@@ -239,7 +245,7 @@ namespace FastDataLoader
 						sb.Append( ", " );
 					sb.Append( GetCSharpTypeName( type ) );
 				}
-				throw new DataLoaderException(
+				throw new FastDataLoaderException(
 					$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 					$"класс или структура имеет конструктор(ы), но ни один из них не подходит к загружаемым из БД данным. " +
 					$"Проверьте типы и порядок колонок в выборке и типы и порядок агрументов конструктора. " +
@@ -251,7 +257,7 @@ namespace FastDataLoader
 			var paramExp = Expression.Parameter( typeof( IDataRecord ), "param" );
 			var targetExp = Expression.Variable( typeof( T ) );
 			var indexerInfo = typeof( IDataRecord ).GetProperty( "Item", new[] { typeof( int ) } );
-			var invalidParameterExpression = typeof( DataLoaderException ).GetConstructor( new Type[] { typeof( string ) } );
+			var invalidParameterExpression = typeof( FastDataLoaderException ).GetConstructor( new Type[] { typeof( string ) } );
 			MethodInfo decimalDiv = typeof( DataLoader<T> ).GetMethod( nameof( DataLoader<T>.TrimZerosDecimal ) );
 			MethodInfo nullableDecimalDiv = typeof( DataLoader<T> ).GetMethod( nameof( DataLoader<T>.TrimZerosNullableDecimal ) );
 
@@ -353,7 +359,7 @@ namespace FastDataLoader
 								mappedColumns[ columnIndex ] = true;
 								mappedProperties[ memberIndex ] = true;
 
-								var blockExp = PrepareExpression(
+								var blockExp = ExpressionForFieldOrProperty(
 									columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
 									member.PropertyType, member.Name,
 									paramExp, targetExp, indexerInfo, invalidParameterExpression, options,
@@ -368,10 +374,15 @@ namespace FastDataLoader
 
 							if( allFieldsColumnNames[ memberIndex ] == ReaderNames[ columnIndex ] )
 							{
+								if( member.IsInitOnly )
+									throw new FastDataLoaderException(
+										$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
+										$"Поле '{member.Name}' помечено как readonly, используйте конструктор для заполнения" );
+
 								mappedColumns[ columnIndex ] = true;
 								mappedFields[ memberIndex ] = true;
 
-								var blockExp = PrepareExpression(
+								var blockExp = ExpressionForFieldOrProperty(
 									columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
 									member.FieldType, member.Name,
 									paramExp, targetExp, indexerInfo, invalidParameterExpression, options,
@@ -401,7 +412,7 @@ namespace FastDataLoader
 					}
 					if( sb.Length > 0 )
 					{
-						throw new DataLoaderException(
+						throw new FastDataLoaderException(
 							$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 							$"В выборке из БД отсутствует отображение в поля или свойства " +
 							$"заполняемого класса или структуры для следующих колонок: {sb}. " +
@@ -425,7 +436,7 @@ namespace FastDataLoader
 					}
 					if( sb.Length > 0 )
 					{
-						throw new DataLoaderException(
+						throw new FastDataLoaderException(
 							$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 							$"у заполняемого класса или структуры отсутствует отображение " +
 							$"на колонки выборки для следующих свойств: {sb}. " +
@@ -446,7 +457,7 @@ namespace FastDataLoader
 					}
 					if( sb.Length > 0 )
 					{
-						throw new DataLoaderException(
+						throw new FastDataLoaderException(
 							$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 							$"у заполняемого класса или структуры отсутствует отображение " +
 							$"на колонки выборки для следующих полей: {sb}. " +
@@ -572,7 +583,7 @@ namespace FastDataLoader
 			return result;
 		}
 
-		private static Expression PrepareExpression( int columnIndex,
+		private static Expression ExpressionForFieldOrProperty( int columnIndex,
 			Type columnType, string columnName, Type memberType, string memberName,
 			Expression paramExp, Expression targetExp, PropertyInfo indexerInfo,
 			ConstructorInfo invalidParameterExpression, DataLoaderOptions options,
@@ -613,7 +624,7 @@ namespace FastDataLoader
 				}
 				if( stringToArrayMethod == null )
 				{
-					throw new DataLoaderException(
+					throw new FastDataLoaderException(
 						$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 						$"поле или свойство '{memberName}' имеет тип {GetCSharpTypeName( memberType )}, " +
 						$"но в типе {GetCSharpTypeName( memberType.GetElementType() )} отсутствует метод " +
@@ -665,7 +676,7 @@ namespace FastDataLoader
 				}
 				if( typeConvertMethod == null )
 				{
-					throw new DataLoaderException( $"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
+					throw new FastDataLoaderException( $"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 						$"поле или свойство '{memberName}' имеет тип {GetCSharpTypeName( memberType )}, " +
 						$"но в типе {memberType.Name} отсутствует метод " +
 						$"private|public static {memberType.Name} AnyNameYouLike({columnType} anyParamName), " +
@@ -747,7 +758,7 @@ namespace FastDataLoader
 					typeof( InvalidCastException ),
 					Expression.Block(
 						Expression.Throw(
-							Expression.New( typeof( DataLoaderException ).GetConstructor( new Type[] { typeof( string ) } ),
+							Expression.New( typeof( FastDataLoaderException ).GetConstructor( new Type[] { typeof( string ) } ),
 							Expression.Constant(
 								$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 								$"значение типа '{GetCSharpTypeName( columnType )}' " +

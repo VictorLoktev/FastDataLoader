@@ -10,7 +10,7 @@ namespace UnitTests
         [TestMethod]
         public void DecimalArray1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345.67 as numeric(18,8) )"
                 );
             reader
@@ -25,7 +25,7 @@ namespace UnitTests
         [TestMethod]
         public void DecimalArray2()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345.67 as numeric(18,8) )" +
                 " union all " +
                 "select A = cast( 67890.12 as numeric(18,8) )"
@@ -43,7 +43,7 @@ namespace UnitTests
         [TestMethod]
         public void DecimalArray0()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345.67 as numeric(18,8) ) " +
                 "where 1=0"
                 );
@@ -58,7 +58,7 @@ namespace UnitTests
         [TestMethod]
         public void Decimal1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345.67 as numeric(18,8) )"
                 );
 
@@ -71,7 +71,7 @@ namespace UnitTests
         [TestMethod]
         public void DecimalError0()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345.67 as numeric(18,8) ) " +
                 "where 1=0"
                 );
@@ -83,7 +83,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }
@@ -91,7 +91,7 @@ namespace UnitTests
         [TestMethod]
         public void DecimalError2()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345.67 as numeric(18,8) )" +
                 " union all " +
                 "select	A = cast( 12345.67 as numeric(18,8) )"
@@ -104,7 +104,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }
@@ -112,7 +112,7 @@ namespace UnitTests
         [TestMethod]
         public void DecimalErrorNull()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( null as numeric(18,8) )"
                 );
 
@@ -123,7 +123,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }
@@ -131,7 +131,7 @@ namespace UnitTests
         [TestMethod]
         public void DecimalErrorArrayNull()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345.67 as numeric(18,8) )" +
                 " union all " +
                 "select A = cast( null as numeric(18,8) )"
@@ -145,7 +145,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }
@@ -154,7 +154,7 @@ namespace UnitTests
         [TestMethod]
         public void TrailingZerosOn()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345.6700 as numeric(18,8) )"
                 );
 
@@ -167,7 +167,7 @@ namespace UnitTests
         [TestMethod]
         public void TrailingZerosOff()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345.6700 as decimal(18,8) )"
                 );
 

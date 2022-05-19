@@ -9,8 +9,8 @@ namespace FastDataLoader
 	[System.Diagnostics.DebuggerNonUserCode()]
 	public class DataLoaderToContext
 	{
-		private IDataReader Reader;
-		private DataLoaderOptions Options;
+		private readonly IDataReader Reader;
+		private readonly DataLoaderOptions Options;
 		public Stopwatch Timer { get; private set; }
 
 
@@ -77,13 +77,13 @@ namespace FastDataLoader
 			}
 
 			if( list == null || list.Count < 1 )
-				throw new DataLoaderException(
+				throw new FastDataLoaderException(
 					ifNoRecordsExceptionMessage ??
 					$"Нарушение при выборке данных из БД - набор данных пуст " +
 					$"(ожидаемый тип - {DataLoader<T>.GetCSharpTypeName( typeof( T ) )})" );
 			else
 			if( list.Count > 1 )
-				throw new DataLoaderException(
+				throw new FastDataLoaderException(
 					ifManyRecordsExceptionMessage ??
 					$"Нарушение при выборке данных из БД - выбрано более одной строки данных " +
 					$"(ожидаемый тип - {DataLoader<T>.GetCSharpTypeName( typeof( T ) )})" );
@@ -103,7 +103,7 @@ namespace FastDataLoader
 				*    ответственность основного кода сделать Dispose перед вызовом Dispose команды.
 				* Reader.Dispose();
 				*/
-			Reader = null;
+			Reader.Close();
 		}
 
 		#region Переопределяемый по необходимости методы

@@ -7,22 +7,20 @@ namespace UnitTests
 {
     internal class DbReader : DataLoaderLoadContext, IDisposable
     {
-        SqlCommand _Command;
-        SqlDataReader _Reader;
+        private readonly SqlCommand _Command;
+        private SqlDataReader _Reader;
 
         public DbReader( string sql )
         {
-            SqlConnection connection = new SqlConnection( "Data Source=127.0.0.1;Initial Catalog=master;Integrated Security=True" );
+            SqlConnection connection = new( "Data Source=127.0.0.1;Initial Catalog=master;Integrated Security=True" );
             connection.Open();
 
-            using( SqlCommand command = new SqlCommand() )
-            {
-                command.Connection = connection;
-                command.CommandTimeout = 300;
-                command.CommandText = sql;
-                _Command = command;
-                _Reader = null;
-            }
+            using SqlCommand command = new();
+            command.Connection = connection;
+            command.CommandTimeout = 300;
+            command.CommandText = sql;
+            _Command = command;
+            _Reader = null;
         }
 
         public void Dispose()

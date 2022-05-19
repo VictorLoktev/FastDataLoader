@@ -10,7 +10,7 @@ namespace UnitTests
         [TestMethod]
         public void BoolArray1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 1 as bit )"
                 );
             reader
@@ -25,7 +25,7 @@ namespace UnitTests
         [TestMethod]
         public void BoolArray2()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 1 as bit )" +
                 " union all " +
                 "select A = cast( 0 as bit )" +
@@ -46,7 +46,7 @@ namespace UnitTests
         [TestMethod]
         public void BoolArray0()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 1 as bit ) " +
                 "where 1=0"
                 );
@@ -61,7 +61,7 @@ namespace UnitTests
         [TestMethod]
         public void Bool1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 1 as bit )"
                 );
 
@@ -74,7 +74,7 @@ namespace UnitTests
         [TestMethod]
         public void Bool12()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( null as bit )"
                 );
 
@@ -87,7 +87,7 @@ namespace UnitTests
         [TestMethod]
         public void BoolError0()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 1 as bit ) " +
                 "where 1=0"
                 );
@@ -99,7 +99,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }
@@ -107,7 +107,7 @@ namespace UnitTests
         [TestMethod]
         public void BoolError2()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 1 as bit )" +
                 " union all " +
                 "select	A = cast( 1 as bit )"
@@ -120,7 +120,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }

@@ -10,7 +10,7 @@ namespace UnitTests
         [TestMethod]
         public void GuidArray1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '51CE512F-1E4F-4995-BE95-A4F7388C88A8' as uniqueidentifier )"
                 );
             reader
@@ -25,7 +25,7 @@ namespace UnitTests
         [TestMethod]
         public void GuidArray2()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '51CE512F-1E4F-4995-BE95-A4F7388C88A8' as uniqueidentifier )" +
                 " union all " +
                 "select A = cast( '5A3F846F-77F9-41B0-9723-CEBE4F9065A9' as uniqueidentifier )" +
@@ -46,7 +46,7 @@ namespace UnitTests
         [TestMethod]
         public void GuidArray0()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '51CE512F-1E4F-4995-BE95-A4F7388C88A8' as uniqueidentifier ) " +
                 "where 1=0"
                 );
@@ -61,7 +61,7 @@ namespace UnitTests
         [TestMethod]
         public void Guid1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '51CE512F-1E4F-4995-BE95-A4F7388C88A8' as uniqueidentifier )"
                 );
 
@@ -74,7 +74,7 @@ namespace UnitTests
         [TestMethod]
         public void Guid12()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( null as uniqueidentifier )"
                 );
 
@@ -87,7 +87,7 @@ namespace UnitTests
         [TestMethod]
         public void GuidError0()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '51CE512F-1E4F-4995-BE95-A4F7388C88A8' as uniqueidentifier ) " +
                 "where 1=0"
                 );
@@ -99,7 +99,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }
@@ -107,7 +107,7 @@ namespace UnitTests
         [TestMethod]
         public void GuidError2()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '51CE512F-1E4F-4995-BE95-A4F7388C88A8' as uniqueidentifier )" +
                 " union all " +
                 "select	A = cast( '51CE512F-1E4F-4995-BE95-A4F7388C88A8' as uniqueidentifier )"
@@ -120,7 +120,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }

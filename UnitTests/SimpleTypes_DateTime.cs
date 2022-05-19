@@ -10,7 +10,7 @@ namespace UnitTests
         [TestMethod]
         public void DateTimeArray1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '2020-01-01' as date )"
                 );
             reader
@@ -25,7 +25,7 @@ namespace UnitTests
         [TestMethod]
         public void DateTimeArray2()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '2020-01-01' as date )" +
                 " union all " +
                 "select A = cast( '2022-12-22' as date )"
@@ -43,7 +43,7 @@ namespace UnitTests
         [TestMethod]
         public void DateTimeArray0()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '2020-01-01' as date ) " +
                 "where 1=0"
                 );
@@ -58,7 +58,7 @@ namespace UnitTests
         [TestMethod]
         public void DateTime1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '2020-01-01' as date )"
                 );
 
@@ -71,7 +71,7 @@ namespace UnitTests
         [TestMethod]
         public void DateTimeError0()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '2020-01-01' as date ) " +
                 "where 1=0"
                 );
@@ -83,7 +83,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }
@@ -91,7 +91,7 @@ namespace UnitTests
         [TestMethod]
         public void DateTimeError2()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '2020-01-01' as date )" +
                 " union all " +
                 "select A = cast( '2022-01-22' as date )"
@@ -104,7 +104,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }
@@ -112,7 +112,7 @@ namespace UnitTests
         [TestMethod]
         public void DateTimeErrorNull()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( null as date )"
                 );
 
@@ -123,7 +123,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }
@@ -131,7 +131,7 @@ namespace UnitTests
         [TestMethod]
         public void DateTimeErrorArrayNull()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '2020-01-01' as date )" +
                 " union all " +
                 "select A = cast( null as date )"
@@ -145,7 +145,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }

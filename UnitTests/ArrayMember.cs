@@ -20,9 +20,13 @@ namespace UnitTests
             // The method returns an array.
             // Column of XML type MS always converts into strings in DataReaders.
             // So, we declare string xml argument anstead of SqlXml xml.
+
+            // Supress warning IDE0051 Private member 'PhoneType.PasseXmlIntoStringArray' is unused UnitTests in code or in project
+#pragma warning disable IDE0051 // Remove unused private members
             private static PhoneType[] PasseXmlIntoStringArray( string xml )
+#pragma warning restore IDE0051 // Remove unused private members
             {
-                List<PhoneType> list = new List<PhoneType>();
+                List<PhoneType> list = new();
                 foreach( var item in XmlToArray<string>( xml ) )
                     list.Add( new PhoneType() { Phone = item } );
                 return list.ToArray();
@@ -50,7 +54,7 @@ namespace UnitTests
         [TestMethod]
         public void LoadArray()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	Name = 'John'" +
                 "   ,   Phones = cast('<root><home>+155512345</home><work>+155554321</work><mobile></mobile></root>' as xml)"
                 );

@@ -10,7 +10,7 @@ namespace UnitTests
         [TestMethod]
         public void IntArray1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int )"
                 );
             reader
@@ -25,7 +25,7 @@ namespace UnitTests
         [TestMethod]
         public void IntArray2()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int )" +
                 " union all " +
                 "select A = cast( 67890 as int )"
@@ -43,7 +43,7 @@ namespace UnitTests
         [TestMethod]
         public void IntArray0()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int ) " +
                 "where 1=0"
                 );
@@ -58,7 +58,7 @@ namespace UnitTests
         [TestMethod]
         public void Int1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int )"
                 );
 
@@ -71,7 +71,7 @@ namespace UnitTests
         [TestMethod]
         public void IntError0()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int ) " +
                 "where 1=0"
                 );
@@ -83,7 +83,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }
@@ -91,7 +91,7 @@ namespace UnitTests
         [TestMethod]
         public void IntError2()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int )" +
                 " union all " +
                 "select	A = cast( 12345 as int )"
@@ -104,7 +104,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }
@@ -112,7 +112,7 @@ namespace UnitTests
         [TestMethod]
         public void IntErrorNull()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( null as int )"
                 );
 
@@ -123,7 +123,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }
@@ -131,7 +131,7 @@ namespace UnitTests
         [TestMethod]
         public void IntErrorArrayNull()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int )" +
                 " union all " +
                 "select A = cast( null as int )"
@@ -145,7 +145,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }

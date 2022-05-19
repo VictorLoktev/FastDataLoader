@@ -36,7 +36,7 @@ namespace UnitTests
         [TestMethod]
         public void Load1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int )" +
                 "   ,   B = cast( '12345' as varchar(100) )"
                 );

@@ -10,7 +10,7 @@ namespace UnitTests
         [TestMethod]
         public void Result3()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int );" +
                 "select B = cast( '12345' as varchar(100) );" +
                 "select C = cast( 1 as bit );"
@@ -32,7 +32,7 @@ namespace UnitTests
         {
             try
             {
-                using DbReader reader = new DbReader(
+                using DbReader reader = new(
                     "select	A = cast( 12345 as int );" +
                     "select B = cast( '12345' as varchar(100) );"
                     // one result set is missing
@@ -46,7 +46,7 @@ namespace UnitTests
                 // .To( out bool? boolValue ) - must have exact one row in the result!
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }
@@ -54,7 +54,7 @@ namespace UnitTests
         [TestMethod]
         public void Result2_2()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( 12345 as int );" +
                 "select B = cast( '12345' as varchar(100) );"
                 // one result set is missing
@@ -74,7 +74,7 @@ namespace UnitTests
         [TestMethod]
         public void Result4()
         {
-            using DbReader reader1 = new DbReader(
+            using DbReader reader1 = new(
                 "select	A = cast( 12345 as int );" +
                 "select B = cast( '12345' as varchar(100) );"
                 );
@@ -87,7 +87,7 @@ namespace UnitTests
 
             // Checking for Dispose inside End()
 
-            using DbReader reader2 = new DbReader(
+            using DbReader reader2 = new(
                 "select B = cast( '12345' as varchar(100) );" +
                 "select	A = cast( 12345 as int );"
                 );

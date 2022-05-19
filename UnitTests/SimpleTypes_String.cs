@@ -10,7 +10,7 @@ namespace UnitTests
         [TestMethod]
         public void StringArray1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '12345' as nvarchar(max) )"
                 );
             reader
@@ -25,7 +25,7 @@ namespace UnitTests
         [TestMethod]
         public void StringArray3()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '12345' as nvarchar(max) )" +
                 " union all " +
                 "select A = cast( '67890' as nvarchar(max) )" +
@@ -46,7 +46,7 @@ namespace UnitTests
         [TestMethod]
         public void StringArray0()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '12345' as nvarchar(max) ) " +
                 "where 1=0"
                 );
@@ -61,7 +61,7 @@ namespace UnitTests
         [TestMethod]
         public void String1()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '12345' as nvarchar(max) )"
                 );
 
@@ -74,7 +74,7 @@ namespace UnitTests
         [TestMethod]
         public void String12()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( null as nvarchar(max) )"
                 );
 
@@ -87,7 +87,7 @@ namespace UnitTests
         [TestMethod]
         public void StringError0()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '12345' as nvarchar(max) ) " +
                 "where 1=0"
                 );
@@ -99,7 +99,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }
@@ -107,7 +107,7 @@ namespace UnitTests
         [TestMethod]
         public void StringError2()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = cast( '12345' as nvarchar(max) )" +
                 " union all " +
                 "select	A = cast( '12345' as nvarchar(max) )"
@@ -120,7 +120,7 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( DataLoaderException )
+            catch( FastDataLoaderException )
             {
             }
         }

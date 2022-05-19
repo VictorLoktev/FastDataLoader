@@ -17,7 +17,7 @@ namespace UnitTests
         [TestMethod]
         public void FillField()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	A = 1" +
                 "   ,   Geo = geometry::STGeomFromText('POLYGON ((0 0, 150 0, 150 150, 0 150, 0 0))', 0)"
                 );
@@ -33,7 +33,7 @@ namespace UnitTests
         [TestMethod]
         public void UseConstructor()
         {
-            using DbReader reader = new DbReader(
+            using DbReader reader = new(
                 "select	Geo = geometry::STGeomFromText('POLYGON ((0 0, 150 0, 150 150, 0 150, 0 0))', 0)"
                 );
             reader

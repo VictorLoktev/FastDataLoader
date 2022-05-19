@@ -7,7 +7,7 @@ namespace PerformaceTest
 {
     internal class TestReader : DataLoaderLoadContext
     {
-        SqlCommand _Command;
+        private readonly SqlCommand _Command;
 
         public TestReader( SqlCommand command )
         {

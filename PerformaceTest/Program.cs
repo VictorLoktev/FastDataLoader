@@ -4,7 +4,7 @@ namespace PerformaceTest
 {
     internal class Program
     {
-        static void Main( string[] args )
+        static void Main()
         {
             CompareSpeed.Run( 1 );
             CompareSpeed.Run( 100 );

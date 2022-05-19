@@ -27,7 +27,7 @@ namespace FastDataLoader
 				return null;
 
 			if( info.Initializer == null )
-				throw new DataLoaderException( "Сбой в алгоритме, инициализатор данных не заполнен" );
+				throw new FastDataLoaderException( "Сбой в алгоритме, инициализатор данных не заполнен" );
 
 			List<T> result = options.LimitRecords.HasValue
 				? new List<T>( options.LimitRecords.Value )
