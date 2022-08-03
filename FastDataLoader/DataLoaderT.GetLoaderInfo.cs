@@ -2,6 +2,7 @@
 using System.CodeDom;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -26,30 +27,37 @@ namespace FastDataLoader
 			if( reader.IsClosed )
 				return null;
 
+			Stopwatch timer = Stopwatch.StartNew();
+
 			// Кол-во полей в выборке
 			int readerFieldCount = reader.FieldCount;
 			if( readerFieldCount == 0 )
 				return null;
 
-			StringBuilder signature = new StringBuilder( typeof( T ).Name );
+			StringBuilder signature = new StringBuilder( "|Type to fill in:" );
+			signature.Append( typeof( T ).Name );
+			signature.Append( "|IDataReader.Fields:" );
 			string[] ReaderNames = new string[ readerFieldCount ];
 			Type[] ReaderTypes = new Type[ readerFieldCount ];
 			for( int i = 0; i < readerFieldCount; i++ )
 			{
 				ReaderTypes[ i ] = reader.GetFieldType( i );
 				ReaderNames[ i ] = reader.GetName( i );
-				signature.Append( '|' );
+				signature.Append( '[' );
 				signature.Append( ReaderNames[ i ] );
-				signature.Append( '~' );
+				signature.Append( " : " );
 				signature.Append( ReaderTypes[ i ] );
+				signature.Append( ']' );
 			}
+			signature.Append( "|DataLoaderOptions:" );
 			signature.Append( options.ToString() );
+			signature.Append( "|" );
 
-			//// Важно чтобы при изменении колонок в DataReader'е (тип, название, очередность),
-			//// а так же при изменении игнорируемых колонок в options
-			//// составлялась новая карта соответствия.
-			//// Все это учитывается при формировании строки ключа в signature.
-			//// Поэтому дополнительная проверка не требуется.
+			// Важно чтобы при изменении колонок в DataReader'е (тип, название, очередность),
+			// а так же при изменении игнорируемых колонок в options
+			// составлялась новая карта соответствия.
+			// Все это учитывается при формировании строки ключа в signature.
+			// Поэтому дополнительная проверка не требуется.
 
 			Sema.Wait();
 			if( LoaderDictionary.TryGetValue( signature.ToString(), out LoaderInfo info ) )
@@ -59,8 +67,7 @@ namespace FastDataLoader
 			}
 			Sema.Release();
 
-			//if( LoaderDictionary.TryGetValue( signature.ToString(), out LoaderInfo info ) )
-			//	return info;
+			Console.WriteLine( $"Информация по {signature}" );
 
 			info = new LoaderInfo();
 
@@ -75,15 +82,15 @@ namespace FastDataLoader
 
 			PropertyInfo[] allProperties = typeof( T )
 				.GetProperties( BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance )
-				.Where( x => UseMember( x.GetCustomAttributes<ColumnAttribute>().FirstOrDefault() ) )
+				.Where( x => TakeMemberIntoAccount( x.GetCustomAttributes<ColumnAttribute>().FirstOrDefault() ) )
 				.Where( x => x.CanWrite )
 				.ToArray();
 
 			FieldInfo[] allFields = typeof( T )
 				.GetFields( BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance )
-				.Where( x => UseMember( x.GetCustomAttributes<ColumnAttribute>().FirstOrDefault() ) )
+				.Where( x => TakeMemberIntoAccount( x.GetCustomAttributes<ColumnAttribute>().FirstOrDefault() ) )
 				//-------
-				// Поля автосгенерированный из свойств
+				// Поля автоматически созданные из свойств
 				//.Where( x => !x.Name.Contains( "BackingField" ) )
 				.Where( f => f.GetCustomAttribute<System.Runtime.CompilerServices.CompilerGeneratedAttribute>() == null )
 				//-------
@@ -132,7 +139,7 @@ namespace FastDataLoader
 
 			#region Поиск подходящего конструктора
 
-			// Считаем кол-во конструкторов с 2-мя и более параметрами
+			// Считаем кол-во конструкторов с двумя и более параметрами
 			int manyParametersCtor = 0;
 			ConstructorInfo foundCtor = null;
 			// Пытаемся найти конструктор с параметрами, совпадающими с читаемыми из БД колонками.
@@ -162,7 +169,7 @@ namespace FastDataLoader
 					Type paramType = Nullable.GetUnderlyingType( parameter.ParameterType ) ?? parameter.ParameterType;
 					Type readerType = Nullable.GetUnderlyingType( ReaderTypes[ index ] ) ?? ReaderTypes[ index ];
 
-					// Если тип параметра конструктура - Enum, то надо сопоставить его с читаемым из БД int
+					// Если тип параметра конструктора - Enum, то надо сопоставить его с читаемым из БД int
 					if( paramType.IsEnum )
 						paramType =
 							Nullable.GetUnderlyingType( parameter.ParameterType ) == null
@@ -216,7 +223,7 @@ namespace FastDataLoader
 			 * и тип простой, то нам не нужны конструкторы
 			 * или иные присвоения - IDataReader и так возвращает значение,
 			 * нам лишь нужно взять значение из IDataReader[0] и вернуть его,
-			 * земенив DBNull.Value на null.
+			 * предварительно заменив DBNull.Value на null.
 			 * Все это не относится и к строке, т.к. string - это class.
 			 * У строки и у Guid'а нет конструктора с соответствующим типом.
 			 * У int? нет конструктора с аргументом, принимающим null.
@@ -233,8 +240,8 @@ namespace FastDataLoader
 				foundCtor == null &&
 				manyParametersCtor > 0 )
 			{
-				/* Конструкторы без параметров или с одним параметром не учитыватся,
-				 * т.к. такие классы/структуры загружатся без конструкторов,
+				/* Конструкторы без параметров или с одним параметром не учитываются,
+				 * т.к. такие классы/структуры загружаются без конструкторов,
 				 * простым перекладыванием из IDataReader в целевое место.
 				 */
 
@@ -248,14 +255,14 @@ namespace FastDataLoader
 				throw new FastDataLoaderException(
 					$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 					$"класс или структура имеет конструктор(ы), но ни один из них не подходит к загружаемым из БД данным. " +
-					$"Проверьте типы и порядок колонок в выборке и типы и порядок агрументов конструктора. " +
+					$"Проверьте типы и порядок колонок в выборке и типы и порядок аргументов конструктора. " +
 					$"Ожидаемые типы: {sb}."
 					);
 			}
 
 			var exps = new List<Expression>();
-			var paramExp = Expression.Parameter( typeof( IDataRecord ), "param" );
-			var targetExp = Expression.Variable( typeof( T ) );
+			var dataRecordInstance = Expression.Parameter( typeof( IDataRecord ), "param" );
+			var targetInstance = Expression.Variable( typeof( T ) );
 			var indexerInfo = typeof( IDataRecord ).GetProperty( "Item", new[] { typeof( int ) } );
 			var invalidParameterExpression = typeof( FastDataLoaderException ).GetConstructor( new Type[] { typeof( string ) } );
 			MethodInfo decimalDiv = typeof( DataLoader<T> ).GetMethod( nameof( DataLoader<T>.TrimZerosDecimal ) );
@@ -268,14 +275,14 @@ namespace FastDataLoader
 				var block = ExpressionForConstructor(
 					0, ReaderTypes[ 0 ], ReaderNames[ 0 ],
 					type, null,
-					paramExp, indexerInfo, invalidParameterExpression,
+					dataRecordInstance, indexerInfo, invalidParameterExpression,
 					castMethod, options,
 					nullableDecimalDiv, decimalDiv );
 
 				exps.Add( block );
 
 				info.Initializer = Expression.Lambda<Func<IDataReader, T>>(
-					Expression.Block( exps ), paramExp ).Compile();
+					Expression.Block( exps ), dataRecordInstance ).Compile();
 			}
 			else
 			if( foundCtor != null )
@@ -290,7 +297,7 @@ namespace FastDataLoader
 					var block = ExpressionForConstructor(
 						columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
 						type, paramInfo[ columnIndex ].Name,
-						paramExp, indexerInfo, invalidParameterExpression,
+						dataRecordInstance, indexerInfo, invalidParameterExpression,
 						null, options,
 						nullableDecimalDiv, decimalDiv );
 
@@ -300,26 +307,11 @@ namespace FastDataLoader
 				exps.Add( Expression.New( foundCtor, ctorExps ) );
 
 				info.Initializer = Expression.Lambda<Func<IDataReader, T>>(
-					Expression.Block( exps ), paramExp ).Compile();
+					Expression.Block( exps ), dataRecordInstance ).Compile();
 			}
 			else
 			{
-				//if( typeof( T ) == typeof( string ) )
-				//  У string нет конструктора без параметров, поэтому обрабатывается отдельно
-				//	exps.Add( Expression.Assign( targetExp, Expression.Constant( string.Empty ) ) );
-				//else
-				if( typeof( T ).IsValueType || typeof( T ).GetConstructor( Type.EmptyTypes ) != null )
-					exps.Add( Expression.Assign( targetExp, Expression.New( targetExp.Type ) ) );
-				else
-				{
-					// Когда у класса нет дефолтного без параметров конструктора,
-					// используется вызов метода FormatterServices.GetUninitializedObject
-					var methodExp = typeof( System.Runtime.Serialization.FormatterServices ).GetMethod( "GetUninitializedObject" );
-					var callExp = Expression.Call( methodExp, Expression.Constant( targetExp.Type ) );
-					exps.Add( Expression.Assign( targetExp, Expression.Convert( callExp, targetExp.Type ) ) );
-				}
-
-				#region инициализация массивов mapped*
+				#region Инициализация массивов mapped*
 
 				bool[] mappedColumns = new bool[ readerFieldCount ];
 				for( int i = 0; i < mappedColumns.Length; i++ )
@@ -339,11 +331,26 @@ namespace FastDataLoader
 
 				#endregion
 
+				//if( typeof( T ) == typeof( string ) )
+				//  У string нет конструктора без параметров, поэтому обрабатывается отдельно
+				//	exps.Add( Expression.Assign( targetExp, Expression.Constant( string.Empty ) ) );
+				//else
+				if( typeof( T ).IsValueType || typeof( T ).GetConstructor( Type.EmptyTypes ) != null )
+					exps.Add( Expression.Assign( targetInstance, Expression.New( targetInstance.Type ) ) );
+				else
+				{
+					// Когда у класса нет конструктора без параметров,
+					// используется вызов метода FormatterServices.GetUninitializedObject
+					var methodExp = typeof( System.Runtime.Serialization.FormatterServices ).GetMethod( "GetUninitializedObject" );
+					var callExp = Expression.Call( methodExp, Expression.Constant( targetInstance.Type ) );
+					exps.Add( Expression.Assign( targetInstance, Expression.Convert( callExp, targetInstance.Type ) ) );
+				}
+
 				for( int columnIndex = 0; columnIndex < readerFieldCount; columnIndex++ )
 				{
 					string columnName = ReaderNames[ columnIndex ];
 
-					if( options.IgnoresColumnNames.Any( colName => colName.Equals( columnName, StringComparison.OrdinalIgnoreCase ) ) )
+					if( options.IgnoreColumnNames.Any( colName => colName.Equals( columnName, StringComparison.OrdinalIgnoreCase ) ) )
 					{
 						// Колонка среди игнорируемых
 						mappedColumns[ columnIndex ] = true;
@@ -362,7 +369,7 @@ namespace FastDataLoader
 								var blockExp = ExpressionForFieldOrProperty(
 									columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
 									member.PropertyType, member.Name,
-									paramExp, targetExp, indexerInfo, invalidParameterExpression, options,
+									dataRecordInstance, targetInstance, indexerInfo, invalidParameterExpression, options,
 									nullableDecimalDiv, decimalDiv );
 								exps.Add( blockExp );
 								break;
@@ -385,7 +392,7 @@ namespace FastDataLoader
 								var blockExp = ExpressionForFieldOrProperty(
 									columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
 									member.FieldType, member.Name,
-									paramExp, targetExp, indexerInfo, invalidParameterExpression, options,
+									dataRecordInstance, targetInstance, indexerInfo, invalidParameterExpression, options,
 									nullableDecimalDiv, decimalDiv );
 								exps.Add( blockExp );
 								break;
@@ -417,7 +424,7 @@ namespace FastDataLoader
 							$"В выборке из БД отсутствует отображение в поля или свойства " +
 							$"заполняемого класса или структуры для следующих колонок: {sb}. " +
 							$"Если какие-то колонки выборки нужно игнорировать, " +
-							$"используйте {nameof( DataLoaderOptions )}.{nameof( DataLoaderOptions.IgnoresColumnNames )}." );
+							$"используйте {nameof( DataLoaderOptions )}.{nameof( DataLoaderOptions.IgnoreColumnNames )}." );
 					}
 				}
 				if( options.ExceptionIfUnmappedFieldOrProperty )
@@ -468,9 +475,9 @@ namespace FastDataLoader
 
 				#endregion
 
-				exps.Add( targetExp );
+				exps.Add( targetInstance );
 				info.Initializer = Expression.Lambda<Func<IDataReader, T>>(
-					Expression.Block( new[] { targetExp }, exps ), paramExp ).Compile();
+					Expression.Block( new[] { targetInstance }, exps ), dataRecordInstance ).Compile();
 			}
 
 			Sema.Wait();
@@ -629,7 +636,7 @@ namespace FastDataLoader
 						$"поле или свойство '{memberName}' имеет тип {GetCSharpTypeName( memberType )}, " +
 						$"но в типе {GetCSharpTypeName( memberType.GetElementType() )} отсутствует метод " +
 						$"private|public static {memberType.Name} AnyNameYouLike(string anyParamName), " +
-						$"который должен пробразовывать из строки xml в массив элементов." );
+						$"который должен преобразовывать из строки xml в массив элементов." );
 				}
 
 				argType = typeof( string );
@@ -718,7 +725,7 @@ namespace FastDataLoader
 				}
 			}
 
-            Expression assign;
+			Expression assign;
 			if( stringToArrayMethod != null )
 				assign = Expression.Assign( Expression.PropertyOrField( targetExp, memberName ), Expression.Call( stringToArrayMethod, argTypedValue ) );
 			else
@@ -777,7 +784,7 @@ namespace FastDataLoader
 		 * По хорошему надо встроить в дерево формируемого Expression вот такую часть
 		 * Expression.Divide( typedVariable, Expression.Constant( 1.000000000000000000000000000000000m ) ),
 		 * но к сожалению, в некоторых случаях обрезание нулей подобным образом не срабатывает.
-		 * В тестовых методах данного проекта срабатывает, а на других проектах с reference на данную библотеку - нет.
+		 * В тестовых методах данного проекта срабатывает, а на других проектах с reference на данную библиотеку - нет.
 		 * Поэтому вместо Expression.Divide в Expression встраивается вызов данного метода для деления на 1.000000000000000000000000000000000m.
 		 * И в проекте, где не работает, вроде начинает работать правильно.
 		 */
@@ -834,15 +841,15 @@ namespace FastDataLoader
 				|| type == typeof( byte[] );
 		}
 
-		private static bool UseMember( ColumnAttribute attr )
+		private static bool TakeMemberIntoAccount( ColumnAttribute attr )
 		{
 			// Если при члене класса не задан атрибут, то член используется в выборке
 			if( attr == null )
 				return true;
-			// Если при члене класса задан атрибут, но маппинг пустой, то член не используется в выборке
+			// Если при члене класса задан атрибут, но отображение члена на колонку пустое, то член не используется в выборке
 			if( string.IsNullOrWhiteSpace( attr.Name ) )
 				return false;
-			// Если при члене класса задан атрибут, маппинг не пустой, то член используется в выборке
+			// Если при члене класса задан атрибут, отображение члена на колонку не пустое, то член используется в выборке
 			return true;
 		}
 	}

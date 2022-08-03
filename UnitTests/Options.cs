@@ -59,7 +59,7 @@ namespace UnitTests
                 "   ,   C = cast( 1 as bit )"
                 );
             reader
-                .Load( new DataLoaderOptions() { IgnoresColumnNames = new string[] { "B", "C" } } )
+                .Load( new DataLoaderOptions() { IgnoreColumnNames = new string[] { "B", "C" } } )
                 .To( out Test1 data )
                 .End();
             Assert.AreEqual( 12345, data.AResult );

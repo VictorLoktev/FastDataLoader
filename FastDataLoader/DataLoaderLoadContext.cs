@@ -6,19 +6,21 @@ namespace FastDataLoader
 	/// <summary>
 	/// <para>Реализация абстрактного класса <see cref="DataLoaderLoadContext"/> должна включать методы</para>
 	/// <para><see cref="GetDataReader"/> и <see cref="DumpSql"/>.</para>
-	/// <para>Метод <see cref="DumpSql"/> вызывается в случае исключения при при вызове метода <see cref="GetDataReader"/>.
+	/// <para>Метод <see cref="DumpSql"/> вызывается в случае исключения при вызове метода <see cref="GetDataReader"/>.
 	/// <see cref="DumpSql"/>Формирует предназначен для выдачу в лог сообщения об ошибке,
 	/// включающем подробности и детали выполняемой команды.
-	/// Если выдача деталей ошибки в лог не требуется, реализаци метода может быть пустой.</para>
+	/// Если выдача деталей ошибки в лог не требуется, реализации метода может быть пустой.</para>
 	/// <para>Методы классов <see cref="DataLoaderLoadContext"/> и <see cref="DataLoaderToContext"/>
 	/// не делают Dispose ни для IDataReader, возвращаемого методом <see cref="GetDataReader"/>,
 	/// ни для команды, выполняющей SQL, к которой привязан IDataReader.
 	/// Поэтому ответственность делать Dispose для IDataReader и команды лежит на коде,
 	/// использующем классы <see cref="DataLoaderLoadContext"/> и <see cref="DataLoaderToContext"/>.</para>
 	/// </summary>
+#if !DEBUG
 	[System.Diagnostics.DebuggerNonUserCode()]
+#endif
 	public abstract class DataLoaderLoadContext
-    {
+	{
 		/// <summary>
 		/// <para>Данный метод путем вызова <see cref="GetDataReader"/>() активирует выполнение SQL-команды и чтения данных из БД.</para>
 		/// <para>Затем формирует контекст <see cref="DataLoaderToContext"/> для последующих вызовов методов <see cref="DataLoaderToContext.To"/>.</para>
@@ -53,7 +55,7 @@ namespace FastDataLoader
 
 		/// <summary>
 		/// Метод перекрывается в случае, если от класса <see cref="DataLoaderToContext"/> надо наследовать другой класс,
-		/// чтобы методы Load и To возвращали отнаследованный от <see cref="DataLoaderToContext"/> класс.
+		/// чтобы методы Load и To возвращали унаследованный от <see cref="DataLoaderToContext"/> класс.
 		/// </summary>
 		/// <param name="reader">Чтение одного или серии выборок из БД.</param>
 		/// <param name="options">Параметры настроек.</param>
@@ -100,7 +102,7 @@ namespace FastDataLoader
 
 		/// <summary>
 		/// <para>Через вызов данного метода осуществляется выдача информации об ошибках при сбоях в методе <see cref="Load"/></para>
-		/// <para>Перекрытие метода позволяет сохранять в логах дополнительную информацию, непоказываемую обычным пользователям.</para>
+		/// <para>Перекрытие метода позволяет сохранять в логах дополнительную информацию, не показываемую обычным пользователям.</para>
 		/// </summary>
 		/// <param name="exception">Исключение, произошедшее при работе с SQL</param>
 		public abstract void DumpSql( Exception exception );

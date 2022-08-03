@@ -7,7 +7,7 @@ using FastDataLoader;
 
 namespace PerformaceTest
 {
-	public class Record
+	public class RecordCls
 	{
 		[Column( "object_id" )]
 		public int Id { get; set; }
@@ -15,92 +15,132 @@ namespace PerformaceTest
 		[Column( "TextData" )]
 		public string Text { get; set; }
 	}
+	public struct RecordStruct
+	{
+		[Column( "object_id" )]
+		public int Id;
+
+		[Column( "TextData" )]
+		public string Text;
+	}
 
 	internal class CompareSpeed
 	{
-		public static void Run( int n )
+		public static void Run( int topN, int nTimes )
 		{
-			Console.WriteLine( $"CompareSpeed: read 1'000'000 times top {n} records" );
-			using SqlConnection connection = new( "Data Source=localhost;Initial Catalog=master;Integrated Security=True" );
+			#region Подготовка
+
+			Console.WriteLine( $"CompareSpeed: read {nTimes} times top {topN} records" );
+			using SqlConnection connection = new( "Data Source=127.0.0.1;Initial Catalog=master;Integrated Security=True" );
 			connection.Open();
 
+			{
+				// Prepare temp table
+				using SqlCommand prepareCmd = connection.CreateCommand();
+				prepareCmd.CommandTimeout = 300;
+				prepareCmd.CommandText = @"
+					create table #temp ( object_id int, TextData varchar(10) );
+
+					insert into #temp (object_id, TextData)
+					select	a.object_id
+						,	TextData = cast( a.object_id as varchar(10) )
+					from	sys.objects a, sys.objects b, sys.objects c;
+
+					select	top " + topN.ToString() + @"
+							object_id
+						,	TextData
+					from	#temp;
+					";
+				prepareCmd.ExecuteNonQuery();
+
+			}
+			using SqlCommand cmd = connection.CreateCommand();
+			cmd.CommandTimeout = 300;
+			cmd.CommandText = @"
+				select	top " + topN.ToString() + @"
+						object_id
+					,	TextData
+				from	#temp;
+				";
+
 			// Let's give all other programs to finish CPU and disk operations
-			System.Threading.Thread.Sleep( 5000 );
+			System.Threading.Thread.Sleep( 2000 );
 
 			Stopwatch innerTimer = new();
 			Stopwatch outerTimer = new();
 
-			outerTimer.Start();
-			for( int i = 0; i < 1_000_000; i++ )
+			DataLoaderOptions options;
+
+			#endregion
+
 			{
-                using SqlCommand cmd = new();
-                InitCommand( connection, cmd, n );
+				GC.Collect();
+				System.Threading.Thread.Sleep( 1000 );
+				options = new()
+				{
+					RemoverTrailingZerosForDecimal = false
+				};
 
-                TestReader reader = new( cmd );
-                var context = reader.Load();
+				outerTimer.Reset();
+				innerTimer.Reset();
 
-                // Here we have DataReader full of data from executed command
+				outerTimer.Start();
+				for( int i = 0; i < nTimes; i++ )
+				{
+					// Execute command and get reader
+					TestReader readerContext = new( cmd );
+					var context = readerContext.Load( options );
 
-                innerTimer.Start();
-                context
-                    .To( out Record[] ids );
-                innerTimer.Stop();
+					// Here we have DataReader full of data from executed command
 
-                // End disposes reader of sql command
-                context.End();
-            }
-			outerTimer.Stop();
+					innerTimer.Start();
+					context
+						.To( out List<RecordStruct> ids );
+					innerTimer.Stop();
 
-			Console.WriteLine( $"Using DataLoader: Inner timer: {innerTimer.Elapsed}. Outer timer: {outerTimer.Elapsed}." );
+					context.End();
 
-			outerTimer.Reset();
-			innerTimer.Reset();
+					readerContext.Clear();
+				}
+				outerTimer.Stop();
+				Console.WriteLine( $"Inner timer: {innerTimer.Elapsed}. Outer timer: {outerTimer.Elapsed}. FastDataLoader. Struct." );
+			}
 
-			outerTimer.Start();
-			for( int i = 0; i < 1_000_000; i++ )
 			{
-                using SqlCommand cmd = new();
-                InitCommand( connection, cmd, n );
+				GC.Collect();
+				System.Threading.Thread.Sleep( 1000 );
 
-                IDataReader reader = new TestReader( cmd ).GetDataReader();
+				outerTimer.Reset();
+				innerTimer.Reset();
 
-                // Here we have DataReader full of data from executed command
+				outerTimer.Start();
+				for( int i = 0; i < nTimes; i++ )
+				{
+					var testReader = new TestReader( cmd );
+					var reader = testReader.GetDataReader();
 
-                List<Record> list = new();
+					// Here we have DataReader full of data from executed command
 
-                innerTimer.Start();
-                while( reader.Read() )
-                {
-                    Record item = new()
-                    {
-                        Id = reader.GetInt32( reader.GetOrdinal( "object_id" ) ),
-                        Text = reader.GetString( reader.GetOrdinal( "TextData" ) )
-                    };
+					List<RecordStruct> list = new();
 
-                    list.Add( item );
-                };
-                innerTimer.Stop();
+					innerTimer.Start();
+					while( reader.Read() )
+					{
+						RecordStruct item = new()
+						{
+							Id = reader.GetInt32( 0 ),
+							Text = reader.GetString( 1 )
+						};
 
-                reader.Dispose();
-            }
-            outerTimer.Stop();
+						list.Add( item );
+					};
+					innerTimer.Stop();
 
-			Console.WriteLine( $"Standard  method: Inner timer: {innerTimer.Elapsed}. Outer timer: {outerTimer.Elapsed}." );
-			Console.WriteLine();
-		}
-
-		private static  void InitCommand( SqlConnection connection, SqlCommand command, int topN )
-		{
-			command.Connection = connection;
-			command.CommandTimeout = 300;
-			command.CommandText = @"
-					select	top " + topN.ToString() + @"
-							a.object_id
-						,	TextData = cast( a.object_id as varchar(10) )
-					from	sys.objects a"
-			// Just one sys.objects table has around 100 records only. We need to clone expracted records.
-			+ ( topN > 100 ? ", sys.objects b" : "" )
-			;
+					testReader.Clear();
+				}
+				outerTimer.Stop();
+				Console.WriteLine( $"Inner timer: {innerTimer.Elapsed}. Outer timer: {outerTimer.Elapsed}. Classic reading. Struct." );
+			}
 		}
 	}
 }

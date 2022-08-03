@@ -3,7 +3,9 @@ using System.Data;
 
 namespace FastDataLoader
 {
+#if !DEBUG
 	[System.Diagnostics.DebuggerNonUserCode()]
+#endif
 	public partial class DataLoader<T>
 	{
 		public static List<T> LoadOne( IDataReader reader, DataLoaderOptions options )

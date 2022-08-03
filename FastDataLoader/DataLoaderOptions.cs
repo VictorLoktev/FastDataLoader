@@ -17,11 +17,11 @@ namespace FastDataLoader
 		/// </summary>
 		public bool ExceptionIfUnmappedFieldOrProperty { get; set; }
 		/// <summary>
-		/// Перечень названий колонок в DataReader, которые должны быть игнорировыны
+		/// Перечень названий колонок в DataReader, которые должны быть проигнорированы
 		/// при составлении соответствия колонок и членов заполняемого класса/структуры.
 		/// По умолчанию - пусто.
 		/// </summary>
-		public string[] IgnoresColumnNames { get; set; }
+		public string[] IgnoreColumnNames { get; set; }
 
 		/// <summary>
 		/// Ограничение количества читаемых записей.
@@ -49,7 +49,7 @@ namespace FastDataLoader
 		{
 			ExceptionIfUnmappedReaderColumn = true;
 			ExceptionIfUnmappedFieldOrProperty = true;
-			IgnoresColumnNames = new string[] { };
+			IgnoreColumnNames = new string[] { };
 			LimitRecords = null;
 			RemoverTrailingZerosForDecimal = true;
 		}
@@ -59,34 +59,36 @@ namespace FastDataLoader
 			return
 				new DataLoaderOptions()
 				{
-					ExceptionIfUnmappedReaderColumn = true,
-					ExceptionIfUnmappedFieldOrProperty = true,
-					IgnoresColumnNames = new string[] { },
-					LimitRecords = null,
+					ExceptionIfUnmappedReaderColumn = ExceptionIfUnmappedReaderColumn,
+					ExceptionIfUnmappedFieldOrProperty = ExceptionIfUnmappedFieldOrProperty,
+					IgnoreColumnNames = IgnoreColumnNames,
+					LimitRecords = LimitRecords,
 				};
 		}
 
-        public override string ToString()
-        {
+		public override string ToString()
+		{
 			StringBuilder sb = new StringBuilder();
-			sb.Append( "ExceptionIfUnmappedReaderColumn: " );
+			sb.Append( "[" );
+			sb.Append( nameof( ExceptionIfUnmappedReaderColumn ) );
+			sb.Append( ": " );
 			sb.Append( ExceptionIfUnmappedReaderColumn );
-			sb.Append( '|' );
-			sb.Append( "ExceptionIfUnmappedFieldOrProperty: " );
+			sb.Append( "][" );
+			sb.Append( nameof( ExceptionIfUnmappedFieldOrProperty ) );
+			sb.Append( ": " );
 			sb.Append( ExceptionIfUnmappedFieldOrProperty );
-			sb.Append( '|' );
-			sb.Append( "RemoverTrailingZerosForDecimal: " );
-			sb.Append( RemoverTrailingZerosForDecimal );
-		
-			if( IgnoresColumnNames == null )
-				IgnoresColumnNames = new string[] { };
-			foreach( string ignore in IgnoresColumnNames )
+			sb.Append( "]" );
+
+			if( IgnoreColumnNames == null )
+				IgnoreColumnNames = new string[] { };
+			foreach( string ignore in IgnoreColumnNames )
 			{
-				sb.Append( "|IgnoresColumnName:" );
+				sb.Append( "[IgnoresColumnName:" );
 				sb.Append( ignore );
+				sb.Append( "]" );
 			}
 
 			return sb.ToString();
-        }
-    }
+		}
+	}
 }
