@@ -42,7 +42,7 @@ namespace FastDataLoader
 		/// <para>False, если для значений типа decimal не делается преобразование с отрезанием нулей.</para>
 		/// <para>Если тип не decimal, то изменений не делается в любом случае.</para>
 		/// </summary>
-		public bool RemoverTrailingZerosForDecimal { get; set; }
+		public bool RemoveTrailingZerosForDecimal { get; set; }
 
 
 		public DataLoaderOptions()
@@ -51,7 +51,7 @@ namespace FastDataLoader
 			ExceptionIfUnmappedFieldOrProperty = true;
 			IgnoreColumnNames = new string[] { };
 			LimitRecords = null;
-			RemoverTrailingZerosForDecimal = true;
+			RemoveTrailingZerosForDecimal = true;
 		}
 
 		public DataLoaderOptions Clone()
@@ -63,6 +63,7 @@ namespace FastDataLoader
 					ExceptionIfUnmappedFieldOrProperty = ExceptionIfUnmappedFieldOrProperty,
 					IgnoreColumnNames = IgnoreColumnNames,
 					LimitRecords = LimitRecords,
+					RemoveTrailingZerosForDecimal = RemoveTrailingZerosForDecimal
 				};
 		}
 
@@ -77,6 +78,14 @@ namespace FastDataLoader
 			sb.Append( nameof( ExceptionIfUnmappedFieldOrProperty ) );
 			sb.Append( ": " );
 			sb.Append( ExceptionIfUnmappedFieldOrProperty );
+			sb.Append( "][" );
+			sb.Append( nameof( LimitRecords ) );
+			sb.Append( ": " );
+			sb.Append( LimitRecords );
+			sb.Append( "][" );
+			sb.Append( nameof( RemoveTrailingZerosForDecimal ) );
+			sb.Append( ": " );
+			sb.Append( RemoveTrailingZerosForDecimal );
 			sb.Append( "]" );
 
 			if( IgnoreColumnNames == null )

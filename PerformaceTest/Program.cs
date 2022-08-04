@@ -8,6 +8,12 @@ namespace PerformaceTest
         {
             Console.WriteLine( "Worm up!" );
             CompareSpeed.Run( 1, 1 );
+            Console.WriteLine( "\r\nRun!" );
+
+            for( int i = 0; i < 10; i++ )
+            {
+                CompareSpeed.Run( 10, 100_000 );
+            }
 
             for( int i = 0; i < 10; i++ )
             {

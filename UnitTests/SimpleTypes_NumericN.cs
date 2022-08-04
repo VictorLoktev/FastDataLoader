@@ -83,7 +83,7 @@ namespace UnitTests
                 );
 
             var value = reader
-                .Load1<TestClass2>( new DataLoaderOptions() { RemoverTrailingZerosForDecimal = true } );
+                .Load1<TestClass2>( new DataLoaderOptions() { RemoveTrailingZerosForDecimal = true } );
 
             Assert.AreEqual( 12345.67m, value.A );
             Assert.AreEqual( 12345.67m, value.B );

@@ -41,9 +41,9 @@ namespace UnitTests
                     .Load()
                     .To( out int intValue )
                     .To( out string stringValue )
+                    // Попытка чтения из закрытого DataReader!
                     .To( out bool? boolValue )
                     .End();
-                // .To( out bool? boolValue ) - must have exact one row in the result!
                 Assert.Fail();
             }
             catch( FastDataLoaderException )
@@ -54,21 +54,29 @@ namespace UnitTests
         [TestMethod]
         public void Result2_2()
         {
-            using DbReader reader = new(
+            try
+            {
+                using DbReader reader = new(
                 "select	A = cast( 12345 as int );" +
                 "select B = cast( '12345' as varchar(100) );"
                 // one result set is missing
                 );
-            reader
-                .Load()
-                .To( out int intValue )
-                .To( out string stringValue )
-                .To( out bool?[] boolValue )
-                .End();
+                reader
+                    .Load()
+                    .To( out int intValue )
+                    .To( out string stringValue )
+                    // Попытка чтения из закрытого DataReader!
+                    .To( out bool?[] boolValue )
+                    .End();
 
-            Assert.AreEqual( 12345, intValue );
-            Assert.AreEqual( "12345", stringValue );
-            Assert.AreEqual( 0, boolValue.Length );
+                //Assert.AreEqual( 12345, intValue );
+                //Assert.AreEqual( "12345", stringValue );
+                //Assert.AreEqual( 0, boolValue.Length );
+                Assert.Fail();
+            }
+            catch( FastDataLoaderException )
+            {
+            }
         }
 
         [TestMethod]

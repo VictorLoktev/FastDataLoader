@@ -12,6 +12,9 @@ namespace PerformaceTest
 		[Column( "object_id" )]
 		public int Id { get; set; }
 
+		[Column( "TestDecimal" )]
+		public decimal Dec { get; set; }
+
 		[Column( "TextData" )]
 		public string Text { get; set; }
 	}
@@ -19,6 +22,9 @@ namespace PerformaceTest
 	{
 		[Column( "object_id" )]
 		public int Id;
+
+		[Column( "TestDecimal" )]
+		public decimal Dec;
 
 		[Column( "TextData" )]
 		public string Text;
@@ -30,7 +36,7 @@ namespace PerformaceTest
 		{
 			#region Подготовка
 
-			Console.WriteLine( $"CompareSpeed: read {nTimes} times top {topN} records" );
+			Console.WriteLine( $"\r\nCompareSpeed: read {nTimes} times top {topN} records" );
 			using SqlConnection connection = new( "Data Source=127.0.0.1;Initial Catalog=master;Integrated Security=True" );
 			connection.Open();
 
@@ -39,35 +45,40 @@ namespace PerformaceTest
 				using SqlCommand prepareCmd = connection.CreateCommand();
 				prepareCmd.CommandTimeout = 300;
 				prepareCmd.CommandText = @"
-					create table #temp ( object_id int, TextData varchar(10) );
+					create table #temp ( object_id int, TextData varchar(10), TestDecimal decimal(18,8) );
 
-					insert into #temp (object_id, TextData)
+					insert into #temp (object_id, TextData, TestDecimal)
 					select	a.object_id
 						,	TextData = cast( a.object_id as varchar(10) )
+						,	TestDecimal = cast( 12345.6700 as decimal(18,8) )
 					from	sys.objects a, sys.objects b, sys.objects c;
 
 					select	top " + topN.ToString() + @"
 							object_id
 						,	TextData
+						,	TestDecimal
 					from	#temp;
 					";
 				prepareCmd.ExecuteNonQuery();
-
 			}
+
 			using SqlCommand cmd = connection.CreateCommand();
 			cmd.CommandTimeout = 300;
 			cmd.CommandText = @"
 				select	top " + topN.ToString() + @"
 						object_id
 					,	TextData
+					,	TestDecimal
 				from	#temp;
 				";
 
 			// Let's give all other programs to finish CPU and disk operations
 			System.Threading.Thread.Sleep( 2000 );
 
-			Stopwatch innerTimer = new();
-			Stopwatch outerTimer = new();
+			Stopwatch innerTimer1 = new();
+			Stopwatch outerTimer1 = new();
+			Stopwatch innerTimer2 = new();
+			Stopwatch outerTimer2 = new();
 
 			DataLoaderOptions options;
 
@@ -78,13 +89,13 @@ namespace PerformaceTest
 				System.Threading.Thread.Sleep( 1000 );
 				options = new()
 				{
-					RemoverTrailingZerosForDecimal = false
+					RemoveTrailingZerosForDecimal = false
 				};
 
-				outerTimer.Reset();
-				innerTimer.Reset();
+				outerTimer1.Reset();
+				innerTimer1.Reset();
 
-				outerTimer.Start();
+				outerTimer1.Start();
 				for( int i = 0; i < nTimes; i++ )
 				{
 					// Execute command and get reader
@@ -93,27 +104,27 @@ namespace PerformaceTest
 
 					// Here we have DataReader full of data from executed command
 
-					innerTimer.Start();
+					innerTimer1.Start();
 					context
 						.To( out List<RecordStruct> ids );
-					innerTimer.Stop();
+					innerTimer1.Stop();
 
 					context.End();
 
 					readerContext.Clear();
 				}
-				outerTimer.Stop();
-				Console.WriteLine( $"Inner timer: {innerTimer.Elapsed}. Outer timer: {outerTimer.Elapsed}. FastDataLoader. Struct." );
+				outerTimer1.Stop();
+				Console.WriteLine( $"Inner timer: {innerTimer1.Elapsed}. Outer timer: {outerTimer1.Elapsed}. FastDataLoader. Struct." );
 			}
 
 			{
 				GC.Collect();
 				System.Threading.Thread.Sleep( 1000 );
 
-				outerTimer.Reset();
-				innerTimer.Reset();
+				outerTimer2.Reset();
+				innerTimer2.Reset();
 
-				outerTimer.Start();
+				outerTimer2.Start();
 				for( int i = 0; i < nTimes; i++ )
 				{
 					var testReader = new TestReader( cmd );
@@ -123,24 +134,33 @@ namespace PerformaceTest
 
 					List<RecordStruct> list = new();
 
-					innerTimer.Start();
+					innerTimer2.Start();
 					while( reader.Read() )
 					{
 						RecordStruct item = new()
 						{
 							Id = reader.GetInt32( 0 ),
-							Text = reader.GetString( 1 )
+							Text = reader.GetString( 1 ),
+							Dec = reader.GetDecimal( 2 ),
 						};
 
 						list.Add( item );
 					};
-					innerTimer.Stop();
+					innerTimer2.Stop();
 
 					testReader.Clear();
 				}
-				outerTimer.Stop();
-				Console.WriteLine( $"Inner timer: {innerTimer.Elapsed}. Outer timer: {outerTimer.Elapsed}. Classic reading. Struct." );
+				outerTimer2.Stop();
+				Console.WriteLine( $"Inner timer: {innerTimer2.Elapsed}. Outer timer: {outerTimer2.Elapsed}. Classic reading. Struct." );
+				Console.WriteLine(
+					$"Inner timer: {GetPercent( innerTimer1, innerTimer2 )}%. " +
+					$"Outer timer: {GetPercent( outerTimer1, outerTimer2 )}%." );
 			}
+		}
+
+		private static string GetPercent( Stopwatch timer1, Stopwatch timer2 )
+		{
+			return Math.Round( 100M * timer1.ElapsedTicks / timer2.ElapsedTicks, 2, MidpointRounding.ToZero ).ToString( "G" );
 		}
 	}
 }
