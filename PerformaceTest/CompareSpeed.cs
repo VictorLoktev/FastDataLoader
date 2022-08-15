@@ -21,13 +21,13 @@ namespace PerformaceTest
 	public struct RecordStruct
 	{
 		[Column( "object_id" )]
-		public int Id;
+		public int Id { get; set; }
 
 		[Column( "TestDecimal" )]
-		public decimal Dec;
+		public decimal Dec { get; set; }
 
 		[Column( "TextData" )]
-		public string Text;
+		public string Text { get; set; }
 	}
 
 	internal class CompareSpeed
@@ -99,8 +99,8 @@ namespace PerformaceTest
 				for( int i = 0; i < nTimes; i++ )
 				{
 					// Execute command and get reader
-					TestReader readerContext = new( cmd );
-					var context = readerContext.Load( options );
+					var testReader = new TestReader( cmd );
+					var context = testReader.Load( options );
 
 					// Here we have DataReader full of data from executed command
 
@@ -109,9 +109,10 @@ namespace PerformaceTest
 						.To( out List<RecordStruct> ids );
 					innerTimer1.Stop();
 
-					context.End();
+					// Не обязательно выполнять, т.к. строкой ниже делается тот же Dispose
+					//context.End();
 
-					readerContext.Clear();
+					testReader.Clear();
 				}
 				outerTimer1.Stop();
 				Console.WriteLine( $"Inner timer: {innerTimer1.Elapsed}. Outer timer: {outerTimer1.Elapsed}. FastDataLoader. Struct." );

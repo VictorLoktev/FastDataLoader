@@ -145,8 +145,10 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
+            catch( FastDataLoaderException ex )
             {
+                Assert.AreEqual( "Ошибка инициализации типа 'bool': поле или свойство '', имеющее тип 'bool', не может принять null из колонки 'A'", ex.Message );
+                Assert.AreEqual( "Data is Null. This method or property cannot be called on Null values.", ex.InnerException.Message );
             }
         }
 

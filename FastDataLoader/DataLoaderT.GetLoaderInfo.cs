@@ -1,178 +1,29 @@
 ﻿using System;
-using System.CodeDom;
 using System.Collections.Generic;
 using System.Data;
-using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
-using System.Threading;
-using Microsoft.CSharp;
 
 namespace FastDataLoader
 {
 	public partial class DataLoader<T>
 	{
-		#region Структуры и декларации
-
-		private class LoaderInfo
-		{
-			public Func<IDataReader, T> Initializer;
-		}
-
-		private static readonly SortedDictionary<string, LoaderInfo> LoaderDictionary = new SortedDictionary<string, LoaderInfo>();
-		private static readonly SemaphoreSlim Sema = new SemaphoreSlim( 1, 1 );
-
-		private struct DataReaderInfo
-		{
-			public MethodInfo GetBoolean;
-			public MethodInfo GetByte;
-			public MethodInfo GetChar;
-			public MethodInfo GetDateTime;
-			public MethodInfo GetDecimal;
-			public MethodInfo GetDouble;
-			public MethodInfo GetFloat;
-			public MethodInfo GetGuid;
-			public MethodInfo GetInt16;
-			public MethodInfo GetInt32;
-			public MethodInfo GetInt64;
-			public MethodInfo GetString;
-			public MethodInfo GetValue;
-			public MethodInfo IsDBNull;
-
-			public DataReaderInfo( IDataReader reader )
-			{
-				GetBoolean = null;
-				GetByte = null;
-				GetChar = null;
-				GetDateTime = null;
-				GetDecimal = null;
-				GetDouble = null;
-				GetFloat = null;
-				GetGuid = null;
-				GetInt16 = null;
-				GetInt32 = null;
-				GetInt64 = null;
-				GetString = null;
-				GetValue = null;
-				IsDBNull = null;
-
-				foreach( MethodInfo mi in reader.GetType().GetInterfaceMap( typeof( IDataRecord ) ).InterfaceMethods )
-				{
-					ParameterInfo[] pi = mi.GetParameters();
-					if( pi.Length != 1 || pi[ 0 ].ParameterType != typeof( int ) )
-						continue;
-					if( mi.ReturnType == typeof( bool ) )
-					{
-						if( mi.Name.Equals( "GetBoolean", StringComparison.OrdinalIgnoreCase ) )
-							GetBoolean = mi;
-						if( mi.Name.Equals( "IsDBNull", StringComparison.OrdinalIgnoreCase ) )
-							IsDBNull = mi;
-					}
-					if( mi.ReturnType == typeof( byte ) && mi.Name.Equals( "GetByte", StringComparison.OrdinalIgnoreCase ) )
-						GetByte = mi;
-					else
-					if( mi.ReturnType == typeof( char ) && mi.Name.Equals( "GetChar", StringComparison.OrdinalIgnoreCase ) )
-						GetChar = mi;
-					else
-					if( mi.ReturnType == typeof( decimal ) && mi.Name.Equals( "GetDecimal", StringComparison.OrdinalIgnoreCase ) )
-						GetDecimal = mi;
-					else
-					if( mi.ReturnType == typeof( DateTime ) && mi.Name.Equals( "GetDateTime", StringComparison.OrdinalIgnoreCase ) )
-						GetDateTime = mi;
-					else
-					if( mi.ReturnType == typeof( double ) && mi.Name.Equals( "GetDouble", StringComparison.OrdinalIgnoreCase ) )
-						GetDouble = mi;
-					else
-					if( mi.ReturnType == typeof( float ) && mi.Name.Equals( "GetFloat", StringComparison.OrdinalIgnoreCase ) )
-						GetFloat = mi;
-					else
-					if( mi.ReturnType == typeof( Guid ) && mi.Name.Equals( "GetGuid", StringComparison.OrdinalIgnoreCase ) )
-						GetGuid = mi;
-					else
-					if( mi.ReturnType == typeof( short ) && mi.Name.Equals( "GetInt16", StringComparison.OrdinalIgnoreCase ) )
-						GetInt16 = mi;
-					else
-					if( mi.ReturnType == typeof( int ) && mi.Name.Equals( "GetInt32", StringComparison.OrdinalIgnoreCase ) )
-						GetInt32 = mi;
-					else
-					if( mi.ReturnType == typeof( long ) && mi.Name.Equals( "GetInt64", StringComparison.OrdinalIgnoreCase ) )
-						GetInt64 = mi;
-					else
-					if( mi.ReturnType == typeof( string ) && mi.Name.Equals( "GetString", StringComparison.OrdinalIgnoreCase ) )
-						GetString = mi;
-					else
-					if( mi.Name.Equals( "GetValue", StringComparison.OrdinalIgnoreCase ) )
-						GetValue = mi;
-				}
-				if( GetBoolean == null ||
-					GetByte == null ||
-					GetChar == null ||
-					GetDateTime == null ||
-					GetDecimal == null ||
-					GetDouble == null ||
-					GetFloat == null ||
-					GetGuid == null ||
-					GetInt16 == null ||
-					GetInt32 == null ||
-					GetInt64 == null ||
-					GetString == null ||
-					GetValue == null ||
-					IsDBNull == null
-					)
-					throw new FastDataLoaderException( "Не получилось определить MethodInfo для всех нужных методов у IDataReader" );
-			}
-		}
-
-		#endregion
-
 		private static LoaderInfo GetLoaderInfo( IDataReader reader, DataLoaderOptions options )
 		{
-			if( reader.IsClosed )
-				return null;
-
-			Stopwatch timer = Stopwatch.StartNew();
-
 			// Кол-во полей в выборке
 			int readerFieldCount = reader.FieldCount;
-			if( readerFieldCount == 0 )
-				return null;
 
-			StringBuilder signature = new StringBuilder( "|Type to fill in:" );
-			signature.Append( typeof( T ).Name );
-			signature.Append( "|IDataReader.Fields:" );
 			string[] ReaderNames = new string[ readerFieldCount ];
 			Type[] ReaderTypes = new Type[ readerFieldCount ];
 			for( int i = 0; i < readerFieldCount; i++ )
 			{
 				ReaderTypes[ i ] = reader.GetFieldType( i );
 				ReaderNames[ i ] = reader.GetName( i );
-				signature.Append( '[' );
-				signature.Append( ReaderNames[ i ] );
-				signature.Append( " : " );
-				signature.Append( ReaderTypes[ i ] );
-				signature.Append( ']' );
 			}
-			signature.Append( "|DataLoaderOptions:" );
-			signature.Append( options.ToString() );
-			signature.Append( "|" );
 
-			// Важно чтобы при изменении колонок в DataReader'е (тип, название, очередность),
-			// а так же при изменении игнорируемых колонок в options
-			// составлялась новая карта соответствия.
-			// Все это учитывается при формировании строки ключа в signature.
-			// Поэтому дополнительная проверка не требуется.
-
-			Sema.Wait();
-			if( LoaderDictionary.TryGetValue( signature.ToString(), out LoaderInfo info ) )
-			{
-				Sema.Release();
-				return info;
-			}
-			Sema.Release();
-
-			info = new LoaderInfo();
+			LoaderInfo info = new LoaderInfo();
 
 			/* Источники:
 			 * https://stackoverflow.com/questions/19841120/generic-dbdatareader-to-listt-mapping
@@ -364,14 +215,12 @@ namespace FastDataLoader
 					);
 			}
 
-			var exps = new List<Expression>();
+			var expList = new List<Expression>();
 			var dataRecordInstance = Expression.Parameter( typeof( IDataRecord ), "param" );
+			var errorHolderInstance = Expression.Parameter( typeof( ErrorHolder ), "param" );
 			var targetInstance = Expression.Variable( typeof( T ) );
-			var indexerInfo = typeof( IDataRecord ).GetProperty( "Item", new[] { typeof( int ) } );
-			var invalidParameterExpression = typeof( FastDataLoaderException ).GetConstructor( new Type[] { typeof( string ) } );
 			MethodInfo decimalDiv = typeof( DataLoader<T> ).GetMethod( nameof( DataLoader<T>.TrimZerosDecimal ) );
 			MethodInfo nullableDecimalDiv = typeof( DataLoader<T> ).GetMethod( nameof( DataLoader<T>.TrimZerosNullableDecimal ) );
-			MethodInfo nullableDecimalDiv2 = typeof( DataLoader<T> ).GetMethod( nameof( DataLoader<T>.TrimZerosNullableDecimal2 ) );
 			DataReaderInfo readerInfo = new DataReaderInfo( reader );
 
 
@@ -384,14 +233,14 @@ namespace FastDataLoader
 				var block = GetValueFromReaderExpression(
 					columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
 					ctorParameterType, ctorParameterName,
-					dataRecordInstance, readerInfo, invalidParameterExpression,
-					options,
-					nullableDecimalDiv2, decimalDiv );
+					dataRecordInstance, errorHolderInstance, info, readerInfo, options,
+					nullableDecimalDiv,
+					decimalDiv );
 
-				exps.Add( block );
+				expList.Add( block );
 
-				info.Initializer = Expression.Lambda<Func<IDataReader, T>>(
-					Expression.Block( exps ), dataRecordInstance ).Compile();
+				info.Initializer = Expression.Lambda<Func<IDataReader, ErrorHolder, T>>(
+					Expression.Block( expList ), dataRecordInstance, errorHolderInstance ).Compile();
 			}
 			else
 			if( foundCtor != null )
@@ -407,17 +256,17 @@ namespace FastDataLoader
 					var block = GetValueFromReaderExpression(
 						columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
 						ctorParameterType, ctorParameterName,
-						dataRecordInstance, readerInfo, invalidParameterExpression,
-						options,
-						nullableDecimalDiv2, decimalDiv );
+						dataRecordInstance, errorHolderInstance, info, readerInfo, options,
+						nullableDecimalDiv,
+						decimalDiv );
 
 					ctorExps.Add( block );
 				}
 
-				exps.Add( Expression.New( foundCtor, ctorExps ) );
+				expList.Add( Expression.New( foundCtor, ctorExps ) );
 
-				info.Initializer = Expression.Lambda<Func<IDataReader, T>>(
-					Expression.Block( exps ), dataRecordInstance ).Compile();
+				info.Initializer = Expression.Lambda<Func<IDataReader, ErrorHolder, T>>(
+					Expression.Block( expList ), dataRecordInstance, errorHolderInstance ).Compile();
 			}
 			else
 			{
@@ -446,14 +295,14 @@ namespace FastDataLoader
 				//	exps.Add( Expression.Assign( targetExp, Expression.Constant( string.Empty ) ) );
 				//else
 				if( typeof( T ).IsValueType || typeof( T ).GetConstructor( Type.EmptyTypes ) != null )
-					exps.Add( Expression.Assign( targetInstance, Expression.New( targetInstance.Type ) ) );
+					expList.Add( Expression.Assign( targetInstance, Expression.New( targetInstance.Type ) ) );
 				else
 				{
 					// Когда у класса нет конструктора без параметров,
 					// используется вызов метода FormatterServices.GetUninitializedObject
 					var methodExp = typeof( System.Runtime.Serialization.FormatterServices ).GetMethod( "GetUninitializedObject" );
 					var callExp = Expression.Call( methodExp, Expression.Constant( targetInstance.Type ) );
-					exps.Add( Expression.Assign( targetInstance, Expression.Convert( callExp, targetInstance.Type ) ) );
+					expList.Add( Expression.Assign( targetInstance, Expression.Convert( callExp, targetInstance.Type ) ) );
 				}
 
 				for( int columnIndex = 0; columnIndex < readerFieldCount; columnIndex++ )
@@ -479,13 +328,29 @@ namespace FastDataLoader
 								var blockExp = GetValueFromReaderExpression(
 									columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
 									member.PropertyType, member.Name,
-									dataRecordInstance, readerInfo, invalidParameterExpression, options,
-									nullableDecimalDiv2, decimalDiv );
-								blockExp = GetMemberAssignExpression( blockExp,
-									ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
-									member.PropertyType, member.Name, targetInstance );
+									dataRecordInstance, errorHolderInstance, info, readerInfo, options, nullableDecimalDiv,
+									decimalDiv );
 
-								exps.Add( blockExp );
+								// Регистрируем ошибку
+								string errorText =
+									$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
+									$"значение типа '{GetCSharpTypeName( ReaderTypes[ columnIndex ] )}' " +
+									$"из колонки '{ReaderNames[ columnIndex ]}' не возможно преобразовать " +
+									$"в тип '{GetCSharpTypeName( member.PropertyType )}' свойства '{member.Name}'";
+								info.ErrorRegister.Add( errorText );
+								int errIndex = info.ErrorRegister.Count - 1;
+								blockExp =
+									Expression.Block(
+										Expression.Assign( Expression.Field( errorHolderInstance, "ErrorPoiter" ),
+											Expression.Constant( errIndex ) ),
+										Expression.Assign( Expression.Property( targetInstance, member.Name ), blockExp )
+									);
+
+								//blockExp = GetMemberAssignExpression( blockExp,
+								//	ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
+								//	member.PropertyType, member.Name, targetInstance, errorHolderInstance, errIndex );
+
+								expList.Add( blockExp );
 								break;
 							}
 						}
@@ -506,13 +371,29 @@ namespace FastDataLoader
 								var blockExp = GetValueFromReaderExpression(
 									columnIndex, ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
 									member.FieldType, member.Name,
-									dataRecordInstance, readerInfo, invalidParameterExpression, options,
-									nullableDecimalDiv2, decimalDiv );
-								blockExp = GetMemberAssignExpression( blockExp,
-									ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
-									member.FieldType, member.Name, targetInstance );
+									dataRecordInstance, errorHolderInstance, info, readerInfo, options, nullableDecimalDiv,
+									decimalDiv );
 
-								exps.Add( blockExp );
+								// Регистрируем ошибку
+								string errorText =
+									$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
+									$"значение типа '{GetCSharpTypeName( ReaderTypes[ columnIndex ] )}' " +
+									$"из колонки '{ReaderNames[ columnIndex ]}' не возможно преобразовать " +
+									$"в тип '{GetCSharpTypeName( member.FieldType )}' поля '{member.Name}'";
+								info.ErrorRegister.Add( errorText );
+								int errIndex = info.ErrorRegister.Count - 1;
+								blockExp =
+									Expression.Block(
+										Expression.Assign( Expression.Field( errorHolderInstance, "ErrorPoiter" ),
+											Expression.Constant( errIndex ) ),
+										Expression.Assign( Expression.Field( targetInstance, member.Name ), blockExp )
+									);
+
+								//blockExp = GetMemberAssignExpression( blockExp,
+								//	ReaderTypes[ columnIndex ], ReaderNames[ columnIndex ],
+								//	member.FieldType, member.Name, targetInstance, errorHolderInstance, errIndex );
+
+								expList.Add( blockExp );
 								break;
 							}
 						}
@@ -521,102 +402,95 @@ namespace FastDataLoader
 
 				#region Ошибки, если есть колонки или поля/свойства без сопоставления
 
+				StringBuilder unusedColumns = new StringBuilder();
+				StringBuilder unusedMembers = new StringBuilder();
+
 				if( options.ExceptionIfUnmappedReaderColumn )
 				{
-					StringBuilder sb = new StringBuilder();
 					for( int i = 0; i < readerFieldCount; i++ )
 					{
 						if( !mappedColumns[ i ] )
 						{
-							if( sb.Length > 0 )
-								sb.Append( ", " );
-							sb.Append( '\'' );
-							sb.Append( ReaderNames[ i ] );
-							sb.Append( '\'' );
+							if( unusedColumns.Length > 0 )
+								unusedColumns.Append( ", " );
+							unusedColumns.Append( '\'' );
+							unusedColumns.Append( ReaderNames[ i ] );
+							unusedColumns.Append( '\'' );
 						}
-					}
-					if( sb.Length > 0 )
-					{
-						throw new FastDataLoaderException(
-							$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
-							$"В выборке из БД отсутствует отображение в поля или свойства " +
-							$"заполняемого класса или структуры для следующих колонок: {sb}. " +
-							$"Если какие-то колонки выборки нужно игнорировать, " +
-							$"используйте {nameof( DataLoaderOptions )}.{nameof( DataLoaderOptions.IgnoreColumnNames )}." );
 					}
 				}
 				if( options.ExceptionIfUnmappedFieldOrProperty )
 				{
-					StringBuilder sb = new StringBuilder();
 					for( int i = 0; i < mappedProperties.Length; i++ )
 					{
 						if( !mappedProperties[ i ] )
 						{
-							if( sb.Length > 0 )
-								sb.Append( ", " );
-							sb.Append( '\'' );
-							sb.Append( allProperties[ i ].Name );
-							sb.Append( '\'' );
+							if( unusedMembers.Length > 0 )
+								unusedMembers.Append( ", " );
+							unusedMembers.Append( '\'' );
+							unusedMembers.Append( allProperties[ i ].Name );
+							unusedMembers.Append( '\'' );
 						}
 					}
-					if( sb.Length > 0 )
-					{
-						throw new FastDataLoaderException(
-							$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
-							$"у заполняемого класса или структуры отсутствует отображение " +
-							$"на колонки выборки для следующих свойств: {sb}. " +
-							$"Чтобы исключить свойство из отображения на колонку, " +
-							$"используйте атрибут [Column(null)]." );
-					}
-
 					for( int i = 0; i < mappedFields.Length; i++ )
 					{
 						if( !mappedFields[ i ] )
 						{
-							if( sb.Length > 0 )
-								sb.Append( ", " );
-							sb.Append( '\'' );
-							sb.Append( allFields[ i ].Name );
-							sb.Append( '\'' );
+							if( unusedMembers.Length > 0 )
+								unusedMembers.Append( ", " );
+							unusedMembers.Append( '\'' );
+							unusedMembers.Append( allFields[ i ].Name );
+							unusedMembers.Append( '\'' );
 						}
 					}
-					if( sb.Length > 0 )
-					{
-						throw new FastDataLoaderException(
-							$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
-							$"у заполняемого класса или структуры отсутствует отображение " +
-							$"на колонки выборки для следующих полей: {sb}. " +
-							$"Чтобы исключить поле из отображения на колонку, " +
-							$"используйте атрибут [Column(null)]." );
-					}
+				}
+
+				if( unusedColumns.Length > 0 || unusedMembers.Length > 0 )
+				{
+					throw new FastDataLoaderException(
+						$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': \r\n" +
+						( unusedColumns.Length > 0
+						? $"Неиспользуемые (без соответствия полям/свойствам) колонки в выборке из БД: {unusedColumns}. \r\n"
+						: ""
+						) +
+						( unusedMembers.Length > 0
+						? $"Неиспользуемые (без соответствия колонкам в выборке из БД)  поля/свойства: {unusedMembers}. \r\n"
+						: ""
+						) +
+						$"Для игнорирования колонки в выборке используйте список " +
+						$"{nameof( DataLoaderOptions )}.{nameof( DataLoaderOptions.IgnoreColumnNames )}. \r\n" +
+						$"Для игнорирования заполнения поля/свойства используйте атрибут [Column(null)]."
+						);
 				}
 
 				#endregion
 
-				exps.Add( targetInstance );
-				info.Initializer = Expression.Lambda<Func<IDataReader, T>>(
-					Expression.Block( new[] { targetInstance }, exps ), dataRecordInstance ).Compile();
+				expList.Add( targetInstance );
+				info.Initializer = Expression.Lambda<Func<IDataReader, ErrorHolder, T>>(
+					Expression.Block( new[] { targetInstance }, expList ), dataRecordInstance, errorHolderInstance ).Compile();
 			}
 
-			Sema.Wait();
-			LoaderDictionary[ signature.ToString() ] = info;
-			Sema.Release();
+			//Sema.Wait();
+			////LoaderDictionary[ signature.ToString() ] = info;
+			//LoaderDictionary[ hashCode.ToHashCode() ] = info;
+			//Sema.Release();
 
 			return info;
 		}
 
 		private static Expression GetValueFromReaderExpression( int columnIndex,
 			Type columnType, string columnName, Type memberType, string memberName,
-			Expression dataReaderInstance, DataReaderInfo readerInfo, ConstructorInfo invalidParameterExpression,
-			DataLoaderOptions options,
-			MethodInfo nullableDecimalDiv, MethodInfo decimalDiv )
+			Expression dataReaderInstance, Expression errorHolderInstance, LoaderInfo loaderInfo,
+			DataReaderInfo readerInfo, DataLoaderOptions options,
+			MethodInfo nullableDecimalDiv,
+			MethodInfo decimalDiv )
 		{
 			Type argType = memberType;
-			Expression errExp = Expression.Constant(
+			string errorText =
 				$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 				$"поле или свойство '{memberName}', " +
 				$"имеющее тип '{GetCSharpTypeName( memberType )}', не может " +
-				$"принять null из колонки '{columnName}'" );
+				$"принять null из колонки '{columnName}'";
 
 			MethodInfo stringToArrayMethod = null;
 			MethodInfo typeConvertMethod = null;
@@ -654,12 +528,12 @@ namespace FastDataLoader
 				}
 
 				argType = typeof( string );
-				errExp = Expression.Constant(
+				errorText =
 					$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 					$"метод {stringToArrayMethod.Name}, преобразующий из строки, содержащей xml, " +
 					$"в массив типов {GetCSharpTypeName( memberType.GetElementType() )} " +
 					$"для поля, свойства или аргумента '{memberName}', не может " +
-					$"принять null из колонки '{columnName}'" );
+					$"принять null из колонки '{columnName}'";
 			}
 			else
 
@@ -703,13 +577,13 @@ namespace FastDataLoader
 						$"private|public static {GetCSharpTypeName( memberType )} AnyNameYouLike({columnType} anyParamName), " +
 						$"который должен делать преобразование типа." );
 				}
-				errExp = Expression.Constant(
+				errorText =
 					$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 					$"метод {typeConvertMethod.Name}, " +
 					$"преобразующий из типа {GetCSharpTypeName( columnType )} " +
 					$"в тип {GetCSharpTypeName( memberType )} " +
 					$"для поля, свойства или аргумента '{memberName}', не может " +
-					$"принять null из колонки '{columnName}'" );
+					$"принять null из колонки '{columnName}'";
 			}
 
 			#endregion
@@ -812,17 +686,30 @@ namespace FastDataLoader
 			}
 			else
 			{
+				//preparedValue =
+				//	Expression.Condition(
+				//		nullCheck,
+				//		Expression.Block(
+				//			Expression.Throw( Expression.New( invalidParameterExpression, errExp ) ),
+				//			// надо что-то вернуть, иначе компиляция выдаст ошибку, т.к. тип expression иной
+				//			Expression.Default( memberType )
+				//		),
+				//		memberType.IsEnum
+				//		? Expression.Convert( convertedValue, memberType )
+				//		: convertedValue
+				//	);
+
+				// Регистрируем ошибку
+				loaderInfo.ErrorRegister.Add( errorText );
+				int errIndex = loaderInfo.ErrorRegister.Count - 1;
+
 				preparedValue =
-					Expression.Condition(
-						nullCheck,
 						Expression.Block(
-							Expression.Throw( Expression.New( invalidParameterExpression, errExp ) ),
-							// надо что-то вернуть, иначе компиляция выдаст ошибку, т.к. тип expression иной
-							Expression.Default( memberType )
-						),
-						memberType.IsEnum
-						? Expression.Convert( convertedValue, memberType )
-						: convertedValue
+							Expression.Assign( Expression.Field( errorHolderInstance, "ErrorPoiter" ),
+								Expression.Constant( errIndex ) ),
+							memberType.IsEnum
+							? Expression.Convert( convertedValue, memberType )
+							: convertedValue
 					);
 			}
 
@@ -840,113 +727,6 @@ namespace FastDataLoader
 					),
 					memberTypedVar
 				);
-		}
-
-		private static Expression GetMemberAssignExpression( Expression valueFromReader,
-			Type columnType, string columnName, Type memberType, string memberName, Expression targetExp )
-		{
-			var exp =
-				Expression.TryCatch(
-					Expression.Block(
-						Expression.Assign( Expression.PropertyOrField( targetExp, memberName ), valueFromReader )
-					),
-					Expression.Catch(
-						typeof( InvalidCastException ),
-						Expression.Block(
-							Expression.Throw(
-								Expression.New( typeof( FastDataLoaderException ).GetConstructor( new Type[] { typeof( string ) } ),
-								Expression.Constant(
-									$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
-									$"значение типа '{GetCSharpTypeName( columnType )}' " +
-									$"из колонки '{columnName}' не возможно преобразовать " +
-									$"в тип '{GetCSharpTypeName( memberType )}' поля или свойства '{memberName}'" )
-								)
-							),
-							Expression.Assign( Expression.PropertyOrField( targetExp, memberName ), Expression.Default( memberType ) )
-						)
-					)
-				);
-
-			return exp;
-		}
-
-		/*
-		 * По хорошему надо встроить в дерево формируемого Expression вот такую часть
-		 * Expression.Divide( typedVariable, Expression.Constant( 1.000000000000000000000000000000000m ) ),
-		 * но к сожалению, в некоторых случаях обрезание нулей подобным образом не срабатывает.
-		 * В тестовых методах данного проекта срабатывает, а на других проектах с reference на данную библиотеку - нет.
-		 * Поэтому вместо Expression.Divide в Expression встраивается вызов данного метода для деления на 1.000000000000000000000000000000000m.
-		 * И в проекте, где не работает, вроде начинает работать правильно.
-		 */
-		public static decimal TrimZerosDecimal( decimal a )
-		{
-			return a / 1.000000000000000000000000000000000m;
-		}
-
-		// См. комментарий к методу TrimZerosDecimal
-		public static decimal? TrimZerosNullableDecimal( decimal? a )
-		{
-			if( a.HasValue )
-				return a.Value / 1.000000000000000000000000000000000m;
-			return null;
-		}
-
-		// См. комментарий к методу TrimZerosDecimal
-		public static decimal? TrimZerosNullableDecimal2( decimal a )
-		{
-			return a / 1.000000000000000000000000000000000m;
-		}
-
-		/// <summary>
-		/// Выдает название типа, соответствующего языку C#. System.String как string, System.Int32 как int
-		/// </summary>
-		/// <param name="type">Тип</param>
-		/// <returns></returns>
-		public static string GetCSharpTypeName( Type type )
-		{
-			if( type == null )
-				return null;
-			using( var provider = new CSharpCodeProvider() )
-			{
-				return provider.GetTypeOutput( new CodeTypeReference( type ) );
-			}
-		}
-
-		public static bool IsSimple( Type type )
-		{
-			// Источник: https://stackoverflow.com/questions/863881/how-do-i-tell-if-a-type-is-a-simple-type-i-e-holds-a-single-value
-			var typeInfo = type.GetTypeInfo();
-			if( typeInfo.IsGenericType && typeInfo.GetGenericTypeDefinition() == typeof( Nullable<> ) )
-			{
-				// nullable type, check if the nested type is simple.
-				return IsSimple( typeInfo.GetGenericArguments()[ 0 ] );
-			}
-			return typeInfo.IsPrimitive
-			  || typeInfo.IsEnum
-			  || type.Equals( typeof( string ) )
-			  || type.Equals( typeof( byte[] ) )
-			  || type.Equals( typeof( decimal ) )
-			  || type.Equals( typeof( DateTime ) )
-			  || type.Equals( typeof( Guid ) );
-		}
-
-		public static bool IsNullable( Type type )
-		{
-			return Nullable.GetUnderlyingType( type ) != null
-				|| type == typeof( string )
-				|| type == typeof( byte[] );
-		}
-
-		private static bool TakeMemberIntoAccount( ColumnAttribute attr )
-		{
-			// Если при члене класса не задан атрибут, то член используется в выборке
-			if( attr == null )
-				return true;
-			// Если при члене класса задан атрибут, но отображение члена на колонку пустое, то член не используется в выборке
-			if( string.IsNullOrWhiteSpace( attr.Name ) )
-				return false;
-			// Если при члене класса задан атрибут, отображение члена на колонку не пустое, то член используется в выборке
-			return true;
 		}
 	}
 }

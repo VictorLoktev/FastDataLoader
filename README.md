@@ -31,121 +31,78 @@ The time of coping data from IDataReader to list/arrays is measured by innerTime
 
 
 ```
-			outerTimer.Start();
-			for( int i = 0; i < 1_000_000; i++ )
-			{
-				using( SqlCommand cmd = new SqlCommand() )
+				outerTimer1.Start();
+				for( int i = 0; i < nTimes; i++ )
 				{
-					InitCommand( connection, cmd, n );
+					// Execute command and get reader
+					var testReader = new TestReader( cmd );
+					var context = testReader.Load( options );
 
-					TestReader reader = new TestReader( cmd );
-					var context = reader.Load();
+					// Here we have DataReader full of data from executed command
 
-					innerTimer.Start();
+					innerTimer1.Start();
 					context
-						.To( out Record[] ids );
-					innerTimer.Stop();
+						.To( out List<RecordStruct> ids );
+					innerTimer1.Stop();
 
-					context.End();
+					testReader.Clear();
 				}
-			}
-			outerTimer.Stop();
+				outerTimer1.Stop();
 ```
 
 #### Standard method
 
 ```
-			outerTimer.Start();
-			for( int i = 0; i < 1_000_000; i++ )
-			{
-				using( SqlCommand cmd = new SqlCommand() )
+				outerTimer2.Start();
+				for( int i = 0; i < nTimes; i++ )
 				{
-					InitCommand( connection, cmd, n );
+					var testReader = new TestReader( cmd );
+					var reader = testReader.GetDataReader();
 
-					IDataReader reader = new TestReader( cmd ).GetDataReader();
+					// Here we have DataReader full of data from executed command
 
-					List<Record> list = new List<Record>();
+					List<RecordStruct> list = new();
 
-					innerTimer.Start();
+					innerTimer2.Start();
 					while( reader.Read() )
 					{
-						Record item = new Record();
-						item.Id = reader.GetInt32( reader.GetOrdinal( "object_id" ) );
-						item.Text = reader.GetString( reader.GetOrdinal( "TextData" ) );
+						RecordStruct item = new()
+						{
+							Id = reader.GetInt32( 0 ),
+							Text = reader.GetString( 1 ),
+							Dec = reader.GetDecimal( 2 ),
+						};
 
 						list.Add( item );
 					};
-					innerTimer.Stop();
+					innerTimer2.Stop();
 
-					reader.Dispose();
+					testReader.Clear();
 				}
+				outerTimer2.Stop();
 ```
 
-### CompareSpeed: read 1'000'000 times top 1 records
+### CompareSpeed: read 1000000 times top 1 records
 
-Using DataLoader: Inner timer: 00:00:06.9385924. Outer timer: 00:07:52.1697057.
+Inner timer: 00:00:03.9613705. Outer timer: 00:06:01.0328361. FastDataLoader. Struct.
 
-Standard  method: Inner timer: 00:00:03.7933012. Outer timer: 00:07:45.1947366.
+Inner timer: 00:00:02.1351468. Outer timer: 00:05:52.4128517. Classic reading. Struct.
 
-Using DataLoader: Inner timer: 00:00:06.2047660. Outer timer: 00:07:39.8613013.
+Inner timer: 185,53%. Outer timer: 102,44%. FastDataLoader to Classic %%.
 
-Standard  method: Inner timer: 00:00:03.9451829. Outer timer: 00:07:45.6672652.
+### CompareSpeed: read 1000000 times top 100 records
 
-Using DataLoader: Inner timer: 00:00:06.3842963. Outer timer: 00:07:47.6996809.
+Inner timer: 00:00:45.3589232. Outer timer: 00:07:35.7143343. FastDataLoader. Struct.
 
-Standard  method: Inner timer: 00:00:04.0797611. Outer timer: 00:07:45.0388535.
+Inner timer: 00:00:38.9100288. Outer timer: 00:07:26.1131845. Classic reading. Struct.
 
-Using DataLoader: Inner timer: 00:00:06.6125721. Outer timer: 00:07:45.2741402.
+Inner timer: 116,57%. Outer timer: 102,15%. FastDataLoader to Classic %%.
 
-Standard  method: Inner timer: 00:00:03.8825388. Outer timer: 00:07:41.4163803.
+### CompareSpeed: read 100000 times top 10000 records
 
-Using DataLoader: Inner timer: 00:00:06.2717159. Outer timer: 00:08:00.4443943.
+Inner timer: 00:06:29.6088946. Outer timer: 00:07:17.1933223. FastDataLoader. Struct.
 
-Standard  method: Inner timer: 00:00:03.7903551. Outer timer: 00:08:00.1455061.
+Inner timer: 00:06:09.9340869. Outer timer: 00:06:56.8428905. Classic reading. Struct.
 
-
-
-### CompareSpeed: read 1'000'000 times top 100 records
-
-Using DataLoader: Inner timer: 00:00:34.9465023. Outer timer: 00:08:59.3660514.
-
-Standard  method: Inner timer: 00:00:37.9452129. Outer timer: 00:09:03.1303205.
-
-Using DataLoader: Inner timer: 00:00:34.1894785. Outer timer: 00:08:57.2302271.
-
-Standard  method: Inner timer: 00:00:36.5574130. Outer timer: 00:08:59.2287383.
-
-Using DataLoader: Inner timer: 00:00:35.3638946. Outer timer: 00:09:00.6853421.
-
-Standard  method: Inner timer: 00:00:37.1277408. Outer timer: 00:09:02.1684993.
-
-Using DataLoader: Inner timer: 00:00:36.1503260. Outer timer: 00:08:57.2432409.
-
-Standard  method: Inner timer: 00:00:38.5351804. Outer timer: 00:09:01.0128626.
-
-Using DataLoader: Inner timer: 00:00:36.5856987. Outer timer: 00:09:06.8530580.
-
-Standard  method: Inner timer: 00:00:38.0171344. Outer timer: 00:09:10.1004365.
-
-
-### CompareSpeed: read 1'000'000 times top 10000 records
-Using DataLoader: Inner timer: 01:16:05.0324473. Outer timer: 01:33:24.1436326.
-
-Standard  method: Inner timer: 01:04:26.2259246. Outer timer: 01:20:45.0832207.
-
-Using DataLoader: Inner timer: 01:16:27.2857545. Outer timer: 01:33:47.6104038.
-
-Standard  method: Inner timer: 01:03:26.1543051. Outer timer: 01:19:47.2364844.
-
-Using DataLoader: Inner timer: 01:24:05.5499788. Outer timer: 01:43:14.1684023.
-
-Standard  method: Inner timer: 01:07:53.9964862. Outer timer: 01:25:16.7780470.
-
-Using DataLoader: Inner timer: 01:14:46.0345437. Outer timer: 01:32:00.9475822.
-
-Standard  method: Inner timer: 01:06:01.5976622. Outer timer: 01:22:24.4597343.
-
-Using DataLoader: Inner timer: 01:23:27.6484370. Outer timer: 01:41:55.7999793.
-
-Standard  method: Inner timer: 01:11:00.9113613. Outer timer: 01:29:29.6347107.
+Inner timer: 105,31%. Outer timer: 104,88%. FastDataLoader to Classic %%.
 

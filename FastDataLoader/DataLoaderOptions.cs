@@ -21,7 +21,8 @@ namespace FastDataLoader
 		/// при составлении соответствия колонок и членов заполняемого класса/структуры.
 		/// По умолчанию - пусто.
 		/// </summary>
-		public string[] IgnoreColumnNames { get; set; }
+		public string[] IgnoreColumnNames { get { return _IgnoreColumnNames; } set { _Hash = null; _IgnoreColumnNames = value; } }
+		private string[] _IgnoreColumnNames;
 
 		/// <summary>
 		/// Ограничение количества читаемых записей.
@@ -42,8 +43,44 @@ namespace FastDataLoader
 		/// <para>False, если для значений типа decimal не делается преобразование с отрезанием нулей.</para>
 		/// <para>Если тип не decimal, то изменений не делается в любом случае.</para>
 		/// </summary>
-		public bool RemoveTrailingZerosForDecimal { get; set; }
+		public bool RemoveTrailingZerosForDecimal { get { return _RemoveTrailingZerosForDecimal; } set { _Hash = null; _RemoveTrailingZerosForDecimal = value; } }
+		private bool _RemoveTrailingZerosForDecimal;
 
+		/// <summary>
+		/// <para>Текст сообщения исключения при вызове метода,
+		/// где результатом должна являться только одна строка без массива или списка,
+		/// а вместо этого результат выборки пустой (получено 0 записей).</para>
+		/// <para>Если текст не задан (здесь null), то выдается стандартное сообщение.</para>
+		/// </summary>
+		public string NoRecordsExceptionMessage { get; set; }
+
+		/// <summary>
+		/// <para>Текст сообщения исключения при вызове метода,
+		/// где результатом должна являться только одна строка без массива или списка,
+		/// а вместо этого результат выборки содержит более 1 строки (получено 2 или более записей).</para>
+		/// <para>Если текст не задан (здесь null), то выдается стандартное сообщение.</para>
+		/// </summary>
+		public string TooManyRecordsExceptionMessage { get; set; }
+
+		private int? _Hash;
+
+		public override int GetHashCode()
+		{
+			if( !_Hash.HasValue )
+			{
+				unchecked
+				{
+					_Hash = RemoveTrailingZerosForDecimal.GetHashCode();
+					if( IgnoreColumnNames == null )
+						IgnoreColumnNames = new string[] { };
+					foreach( string item in IgnoreColumnNames )
+					{
+						_Hash = _Hash * 23 + item.GetHashCode();
+					}
+				}
+			}
+			return _Hash.Value;
+		}
 
 		public DataLoaderOptions()
 		{
@@ -52,52 +89,10 @@ namespace FastDataLoader
 			IgnoreColumnNames = new string[] { };
 			LimitRecords = null;
 			RemoveTrailingZerosForDecimal = true;
-		}
+			NoRecordsExceptionMessage = null;
+			TooManyRecordsExceptionMessage = null;
 
-		public DataLoaderOptions Clone()
-		{
-			return
-				new DataLoaderOptions()
-				{
-					ExceptionIfUnmappedReaderColumn = ExceptionIfUnmappedReaderColumn,
-					ExceptionIfUnmappedFieldOrProperty = ExceptionIfUnmappedFieldOrProperty,
-					IgnoreColumnNames = IgnoreColumnNames,
-					LimitRecords = LimitRecords,
-					RemoveTrailingZerosForDecimal = RemoveTrailingZerosForDecimal
-				};
-		}
-
-		public override string ToString()
-		{
-			StringBuilder sb = new StringBuilder();
-			sb.Append( "[" );
-			sb.Append( nameof( ExceptionIfUnmappedReaderColumn ) );
-			sb.Append( ": " );
-			sb.Append( ExceptionIfUnmappedReaderColumn );
-			sb.Append( "][" );
-			sb.Append( nameof( ExceptionIfUnmappedFieldOrProperty ) );
-			sb.Append( ": " );
-			sb.Append( ExceptionIfUnmappedFieldOrProperty );
-			sb.Append( "][" );
-			sb.Append( nameof( LimitRecords ) );
-			sb.Append( ": " );
-			sb.Append( LimitRecords );
-			sb.Append( "][" );
-			sb.Append( nameof( RemoveTrailingZerosForDecimal ) );
-			sb.Append( ": " );
-			sb.Append( RemoveTrailingZerosForDecimal );
-			sb.Append( "]" );
-
-			if( IgnoreColumnNames == null )
-				IgnoreColumnNames = new string[] { };
-			foreach( string ignore in IgnoreColumnNames )
-			{
-				sb.Append( "[IgnoresColumnName:" );
-				sb.Append( ignore );
-				sb.Append( "]" );
-			}
-
-			return sb.ToString();
+			_Hash = null;
 		}
 	}
 }

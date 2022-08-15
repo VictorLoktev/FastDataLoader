@@ -66,18 +66,18 @@ namespace FastDataLoader
 		}
 
 
-		public T Load1<T>( string ifNotExactlyOneRecordExceptionMessage = null )
+		public T Load1<T>()
 		{
 			Load( new DataLoaderOptions() )
-				.To( out T result, ifNotExactlyOneRecordExceptionMessage )
+				.To( out T result )
 				.End();
 			return result;
 		}
 
-		public T Load1<T>( DataLoaderOptions options, string ifNotExactlyOneRecordExceptionMessage = null )
+		public T Load1<T>( DataLoaderOptions options )
 		{
 			Load( options )
-				.To( out T result, ifNotExactlyOneRecordExceptionMessage )
+				.To( out T result )
 				.End();
 			return result;
 		}

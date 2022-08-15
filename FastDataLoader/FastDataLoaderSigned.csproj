@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <SignAssembly>True</SignAssembly>
     <AssemblyOriginatorKeyFile>sgKey.snk</AssemblyOriginatorKeyFile>
-    <Version>22.08.04.10</Version>
+    <Version>22.08.15.12</Version>
     <AssemblyVersion></AssemblyVersion>
   </PropertyGroup>
 
