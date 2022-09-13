@@ -3,7 +3,11 @@ using System.Runtime.Serialization;
 
 namespace FastDataLoader
 {
-    public class DataLoaderException : Exception
+	/// <summary>
+	/// <para>Базовой исключение для библиотеки.</para>
+    /// <para>Самой библиотекой ни где не кидается.</para>
+	/// </summary>
+	public class DataLoaderException : Exception
     {
         public DataLoaderException()
         {
