@@ -45,12 +45,16 @@ namespace UnitTests
                 // Columns B and C are not mapped to class members
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+			catch( DataLoaderMetadataException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "Возвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void IgnoreColumns()
         {
             using DbReader reader = new(

@@ -207,7 +207,7 @@ namespace FastDataLoader
 						sb.Append( ", " );
 					sb.Append( GetCSharpTypeName( type ) );
 				}
-				throw new FastDataLoaderException(
+				throw new DataLoaderMetadataException(
 					$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 					$"класс или структура имеет конструктор(ы), но ни один из них не подходит к загружаемым из БД данным. " +
 					$"Проверьте типы и порядок колонок в выборке и типы и порядок аргументов конструктора. " +
@@ -361,7 +361,7 @@ namespace FastDataLoader
 							if( allFieldsColumnNames[ memberIndex ] == ReaderNames[ columnIndex ] )
 							{
 								if( member.IsInitOnly )
-									throw new FastDataLoaderException(
+									throw new DataLoaderMetadataException(
 										$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 										$"Поле '{member.Name}' помечено как readonly, используйте конструктор для заполнения" );
 
@@ -447,7 +447,7 @@ namespace FastDataLoader
 
 				if( unusedColumns.Length > 0 || unusedMembers.Length > 0 )
 				{
-					throw new FastDataLoaderException(
+					throw new DataLoaderMetadataException(
 						$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': \r\n" +
 						( unusedColumns.Length > 0
 						? $"Неиспользуемые (без соответствия полям/свойствам) колонки в выборке из БД: {unusedColumns}. \r\n"
@@ -519,7 +519,7 @@ namespace FastDataLoader
 				}
 				if( stringToArrayMethod == null )
 				{
-					throw new FastDataLoaderException(
+					throw new DataLoaderMetadataException(
 						$"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 						$"поле или свойство '{memberName}' имеет тип {GetCSharpTypeName( memberType )}, " +
 						$"но в типе {GetCSharpTypeName( memberType.GetElementType() )} отсутствует метод " +
@@ -571,7 +571,7 @@ namespace FastDataLoader
 				}
 				if( typeConvertMethod == null )
 				{
-					throw new FastDataLoaderException( $"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
+					throw new DataLoaderMetadataException( $"Ошибка инициализации типа '{GetCSharpTypeName( typeof( T ) )}': " +
 						$"поле или свойство '{memberName}' имеет тип {GetCSharpTypeName( memberType )}, " +
 						$"но в декларации типа {GetCSharpTypeName( memberType )} отсутствует метод " +
 						$"private|public static {GetCSharpTypeName( memberType )} AnyNameYouLike({columnType} anyParamName), " +

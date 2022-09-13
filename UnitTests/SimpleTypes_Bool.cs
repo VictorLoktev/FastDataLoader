@@ -83,12 +83,16 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+			catch( DataLoaderNoRecordsException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "Возвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void BoolError2()
         {
             using DbReader reader = new(
@@ -104,12 +108,16 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+			catch( DataLoaderTooManyRecordsException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "Возвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void BoolErrorNull()
         {
             using DbReader reader = new(
@@ -121,14 +129,19 @@ namespace UnitTests
                 bool value = reader
                     .Load1<bool>();
 
+                // null нельзя преобразовать в bool - ошибка, если получилось
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+			catch( DataLoaderRuntimeException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "Возвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void BoolErrorArrayNull()
         {
             using DbReader reader = new(
@@ -145,12 +158,16 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( FastDataLoaderException ex )
+            catch( DataLoaderRuntimeException ex )
             {
                 Assert.AreEqual( "Ошибка инициализации типа 'bool': поле или свойство '', имеющее тип 'bool', не может принять null из колонки 'A'", ex.Message );
                 Assert.AreEqual( "Data is Null. This method or property cannot be called on Null values.", ex.InnerException.Message );
             }
-        }
+			catch( Exception )
+			{
+				Assert.Fail( "Возвращен неправильный тип Exception" );
+			}
+		}
 
-    }
+	}
 }

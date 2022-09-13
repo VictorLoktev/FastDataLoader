@@ -83,9 +83,13 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
+			catch(DataLoaderNoRecordsException )
+			{
+			}
+			catch(Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
         }
 
         [TestMethod]
@@ -104,12 +108,16 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+			catch( DataLoaderTooManyRecordsException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void GuidErrorNull()
         {
             using DbReader reader = new(
@@ -121,14 +129,19 @@ namespace UnitTests
                 Guid value = reader
                     .Load1<Guid>();
 
-                Assert.Fail();
-            }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+				// null нельз€ преобразовать в Guid - ошибка, если получилось
+				Assert.Fail();
+			}
+			catch( DataLoaderRuntimeException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void GuidErrorArrayNull()
         {
             using DbReader reader = new(
@@ -143,12 +156,17 @@ namespace UnitTests
                 .To( out Guid[] value )
                 .End();
 
-                Assert.Fail();
-            }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+				// null нельз€ преобразовать в Guid - ошибка, если получилось
+				Assert.Fail();
+			}
+			catch( DataLoaderRuntimeException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-    }
+	}
 }

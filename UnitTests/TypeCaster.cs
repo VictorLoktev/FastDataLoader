@@ -19,7 +19,7 @@ namespace UnitTests
         {
             public string NumberStr { get; private set; }
 
-            // Supress warning IDE0051 Private member 'PhoneType.MyMethodForCastingFromLongToPhoneType' is unused UnitTests in code or in project
+            // Suppress warning IDE0051 Private member 'PhoneType.MyMethodForCastingFromLongToPhoneType' is unused UnitTests in code or in project
 #pragma warning disable IDE0051 // Remove unused private members
             private static PhoneType MyMethodForCastingFromLongToPhoneType( long number )
 #pragma warning restore IDE0051 // Remove unused private members

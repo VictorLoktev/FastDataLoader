@@ -91,12 +91,16 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+			catch( DataLoaderNoRecordsException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void DecimalError2()
         {
             using DbReader reader = new(
@@ -112,12 +116,16 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+			catch( DataLoaderTooManyRecordsException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void DecimalErrorNull()
         {
             using DbReader reader = new(
@@ -129,14 +137,19 @@ namespace UnitTests
                 decimal value = reader
                     .Load1<decimal>();
 
-                Assert.Fail();
-            }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+				// null нельз€ преобразовать в decimal - ошибка, если получилось
+				Assert.Fail();
+			}
+			catch( DataLoaderRuntimeException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void DecimalErrorArrayNull()
         {
             using DbReader reader = new(
@@ -151,15 +164,20 @@ namespace UnitTests
                 .To( out decimal[] value )
                 .End();
 
-                Assert.Fail();
-            }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+				// null нельз€ преобразовать в decimal - ошибка, если получилось
+				Assert.Fail();
+			}
+			catch( DataLoaderRuntimeException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
 
-        [TestMethod]
+		[TestMethod]
         public void TrailingZerosOn()
         {
             using DbReader reader = new(
@@ -211,7 +229,5 @@ namespace UnitTests
 
             Assert.AreEqual( "12345.67000000", value.A.ToString( "G", System.Globalization.CultureInfo.GetCultureInfo( "en-US" ) ) );
         }
-
-
     }
 }

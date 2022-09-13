@@ -83,12 +83,16 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+			catch( DataLoaderNoRecordsException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void DateTimeError2()
         {
             using DbReader reader = new(
@@ -104,12 +108,16 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+			catch( DataLoaderTooManyRecordsException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void DateTimeErrorNull()
         {
             using DbReader reader = new(
@@ -121,14 +129,19 @@ namespace UnitTests
                 DateTime value = reader
                     .Load1<DateTime>();
 
-                Assert.Fail();
-            }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+				// null нельз€ преобразовать в DateTime - ошибка, если получилось
+				Assert.Fail();
+			}
+			catch( DataLoaderRuntimeException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void DateTimeErrorArrayNull()
         {
             using DbReader reader = new(
@@ -144,11 +157,17 @@ namespace UnitTests
                 .End();
 
                 Assert.Fail();
-            }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+				// null нельз€ преобразовать в DateTime - ошибка, если получилось
+				Assert.Fail();
+			}
+			catch( DataLoaderRuntimeException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-    }
+	}
 }

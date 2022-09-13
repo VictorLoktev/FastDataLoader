@@ -99,12 +99,16 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+			catch( DataLoaderNoRecordsException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "Возвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void DecimalError2()
         {
             using DbReader reader = new(
@@ -120,9 +124,13 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
-    }
+			catch( DataLoaderTooManyRecordsException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "Возвращен неправильный тип Exception" );
+			}
+		}
+	}
 }

@@ -46,12 +46,16 @@ namespace UnitTests
                     .End();
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
+            catch( DataLoaderClosedReaderException )
             {
             }
-        }
+			catch( Exception )
+			{
+				Assert.Fail( "Возвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void Result2_2()
         {
             try
@@ -74,12 +78,16 @@ namespace UnitTests
                 //Assert.AreEqual( 0, boolValue.Length );
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+			catch( DataLoaderClosedReaderException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "Возвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void Result4()
         {
             using DbReader reader1 = new(

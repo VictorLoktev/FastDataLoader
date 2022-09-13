@@ -10,6 +10,8 @@ namespace FastDataLoader
 #endif
 	public class DataLoaderToContext
 	{
+		private const string ClosedReaderMessage = "There is a try to load from already closed DataReader";
+
 		private IDataReader Reader;
 		private readonly DataLoaderOptions Options;
 
@@ -36,7 +38,7 @@ namespace FastDataLoader
 		public DataLoaderToContext To<T>( out T[] result )
 		{
 			if( Reader == null || Reader.IsClosed || Reader.FieldCount == 0)
-				throw new FastDataLoaderException( "There is a try to load from already closed DataReader" );
+				throw new DataLoaderClosedReaderException( ClosedReaderMessage );
 
 			List<T> list = DataLoader<T>.LoadOneResultSet( Reader, Options, int.MaxValue );
 			//if( !Reader.NextResult() )
@@ -60,7 +62,7 @@ namespace FastDataLoader
 		public DataLoaderToContext To<T>( out List<T> result )
 		{
 			if( Reader == null || Reader.IsClosed || Reader.FieldCount == 0 )
-				throw new FastDataLoaderException( "There is a try to load from already closed DataReader" );
+				throw new DataLoaderClosedReaderException( ClosedReaderMessage );
 
 			List<T> list = DataLoader<T>.LoadOneResultSet( Reader, Options, int.MaxValue );
 			result = list ?? new List<T>( 1 );
@@ -86,24 +88,20 @@ namespace FastDataLoader
 		public DataLoaderToContext To<T>( out T result )
 		{
 			if( Reader == null || Reader.IsClosed || Reader.FieldCount == 0 )
-				throw new FastDataLoaderException( "There is a try to load from already closed DataReader" );
+				throw new DataLoaderClosedReaderException( ClosedReaderMessage );
 
 			List<T> list = DataLoader<T>.LoadOneResultSet( Reader, Options, 1 );
 
 			if( list == null || list.Count < 1 )
 			{
-				throw new FastDataLoaderException(
-					Options.NoRecordsExceptionMessage ??
-					$"Нарушение при выборке данных из БД - набор данных пуст " +
-					$"(ожидаемый тип - {DataLoader<T>.GetCSharpTypeName( typeof( T ) )})" );
+				throw Options.NoRecordsExceptionDelegate?.Invoke( typeof( T ) )
+					?? DataLoaderOptions.StandardNoRecordsException( typeof( T ) );
 			}
 			else
 			if( list.Count > 1 || Reader.Read() )
 			{
-				throw new FastDataLoaderException(
-					Options.TooManyRecordsExceptionMessage ??
-					$"Нарушение при выборке данных из БД - выбрано более одной строки данных " +
-					$"(ожидаемый тип - {DataLoader<T>.GetCSharpTypeName( typeof( T ) )})" );
+				throw Options.TooManyRecordsExceptionDelegate?.Invoke( typeof( T ) )
+					?? DataLoaderOptions.StandardTooManyRecordsException( typeof( T ) );
 			}
 			else
 			{

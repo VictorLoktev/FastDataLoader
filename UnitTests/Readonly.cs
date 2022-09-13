@@ -38,13 +38,17 @@ namespace UnitTests
 
                 Assert.Fail( "Ошибка: здесь должно быть исключение из-за поля, помеченного readonly" );
             }
-            catch( FastDataLoaderException )
+            catch( DataLoaderMetadataException )
             {
-                /*
+				/*
                  * Здесь ошибка:
-                 * FastDataLoader.DataLoaderException: 'Ошибка инициализации типа 'UnitTests.Readonly.Test1': Поле 'A' помечено как readonly, используйте конструктор для заполнения'
+                 * FastDataLoader.DataLoaderMetadataException: 'Ошибка инициализации типа 'UnitTests.Readonly.Test1': Поле 'A' помечено как readonly, используйте конструктор для заполнения'
                  */
-            }
-        }
-    }
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "Возвращен неправильный тип Exception");
+			}
+		}
+	}
 }

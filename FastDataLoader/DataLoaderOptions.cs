@@ -1,7 +1,10 @@
-﻿using System.Text;
+﻿using System;
+using System.Text;
 
 namespace FastDataLoader
 {
+	public delegate Exception DataLoaderErrorFabric( Type typeToFill );
+
 	public class DataLoaderOptions
 	{
 		/// <summary>
@@ -51,8 +54,9 @@ namespace FastDataLoader
 		/// где результатом должна являться только одна строка без массива или списка,
 		/// а вместо этого результат выборки пустой (получено 0 записей).</para>
 		/// <para>Если текст не задан (здесь null), то выдается стандартное сообщение.</para>
+		/// <para>Пример использования: NoRecordsExceptionDelegate=delegate</para>
 		/// </summary>
-		public string NoRecordsExceptionMessage { get; set; }
+		public DataLoaderErrorFabric NoRecordsExceptionDelegate { get; set; }
 
 		/// <summary>
 		/// <para>Текст сообщения исключения при вызове метода,
@@ -60,7 +64,7 @@ namespace FastDataLoader
 		/// а вместо этого результат выборки содержит более 1 строки (получено 2 или более записей).</para>
 		/// <para>Если текст не задан (здесь null), то выдается стандартное сообщение.</para>
 		/// </summary>
-		public string TooManyRecordsExceptionMessage { get; set; }
+		public DataLoaderErrorFabric TooManyRecordsExceptionDelegate { get; set; }
 
 		private int? _Hash;
 
@@ -89,10 +93,29 @@ namespace FastDataLoader
 			IgnoreColumnNames = new string[] { };
 			LimitRecords = null;
 			RemoveTrailingZerosForDecimal = true;
-			NoRecordsExceptionMessage = null;
-			TooManyRecordsExceptionMessage = null;
+			NoRecordsExceptionDelegate = delegate ( Type typeToFill )
+			{
+				return StandardNoRecordsException( typeToFill );
+			};
+			TooManyRecordsExceptionDelegate = delegate ( Type typeToFill )
+			{
+				return StandardTooManyRecordsException( typeToFill );
+			};
 
 			_Hash = null;
+		}
+
+		internal static DataLoaderException StandardNoRecordsException( Type typeToFill )
+		{
+			return new DataLoaderNoRecordsException(
+				$"Нарушение при выборке данных из БД - набор данных пуст " +
+				$"(ожидаемый тип - {DataLoader<int>.GetCSharpTypeName( typeToFill )})" );
+		}
+		internal static DataLoaderException StandardTooManyRecordsException( Type typeToFill )
+		{
+			return new DataLoaderTooManyRecordsException(
+				$"Нарушение при выборке данных из БД - выбрано более одной строки данных " +
+				$"(ожидаемый тип - {DataLoader<int>.GetCSharpTypeName( typeToFill )})" );
 		}
 	}
 }

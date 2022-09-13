@@ -83,12 +83,16 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+			catch( DataLoaderNoRecordsException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void IntError2()
         {
             using DbReader reader = new(
@@ -104,12 +108,16 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+			catch( DataLoaderTooManyRecordsException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void IntErrorNull()
         {
             using DbReader reader = new(
@@ -121,14 +129,19 @@ namespace UnitTests
                 int value = reader
                     .Load1<int>();
 
-                Assert.Fail();
-            }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+				// null нельз€ преобразовать в int - ошибка, если получилось
+				Assert.Fail();
+			}
+			catch( DataLoaderRuntimeException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void IntErrorArrayNull()
         {
             using DbReader reader = new(
@@ -143,12 +156,17 @@ namespace UnitTests
                 .To( out int[] value )
                 .End();
 
-                Assert.Fail();
-            }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+				// null нельз€ преобразовать в int - ошибка, если получилось
+				Assert.Fail();
+			}
+			catch( DataLoaderRuntimeException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-    }
+	}
 }

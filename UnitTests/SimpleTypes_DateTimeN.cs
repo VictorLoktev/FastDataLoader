@@ -99,8 +99,12 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
+            catch( DataLoaderNoRecordsException )
             {
+            }
+            catch( Exception )
+            {
+                Assert.Fail( "Возвращен неправильный тип Exception" );
             }
         }
 
@@ -118,11 +122,15 @@ namespace UnitTests
                 DateTime value = reader
                     .Load1<DateTime>();
 
-                Assert.Fail();
-            }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
-    }
+				Assert.Fail();
+			}
+			catch( DataLoaderTooManyRecordsException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "Возвращен неправильный тип Exception" );
+			}
+		}
+	}
 }

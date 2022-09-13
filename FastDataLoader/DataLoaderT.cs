@@ -134,7 +134,7 @@ namespace FastDataLoader
 					GetValue == null ||
 					IsDBNull == null
 					)
-					throw new FastDataLoaderException( "Не получилось определить MethodInfo для всех нужных методов у IDataReader" );
+					throw new DataLoaderMetadataException( "Не получилось определить MethodInfo для всех нужных методов у IDataReader" );
 			}
 		}
 
@@ -174,7 +174,7 @@ namespace FastDataLoader
 			{
 				info = GetLoaderInfo( reader, options );
 				if( info == null || info.Initializer == null )
-					throw new FastDataLoaderException( "Сбой в алгоритме, инициализатор данных не заполнен" );
+					throw new DataLoaderMetadataException( "Сбой в алгоритме, инициализатор данных не заполнен" );
 
 				try
 				{
@@ -199,7 +199,7 @@ namespace FastDataLoader
 			catch( Exception ex )
 			{
 				if( err != null && err.ErrorPoiter >= 0 && err.ErrorPoiter < info.ErrorRegister.Count )
-					throw new FastDataLoaderException( info.ErrorRegister[ err.ErrorPoiter ], ex );
+					throw new DataLoaderRuntimeException( info.ErrorRegister[ err.ErrorPoiter ], ex );
 				throw;
 			}
 		}

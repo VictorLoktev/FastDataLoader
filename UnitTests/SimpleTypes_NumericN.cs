@@ -60,7 +60,7 @@ namespace UnitTests
             public decimal C { get; private set; }
             public decimal? D { get; private set; }
 
-            // Supress warning IDE0051 Private member 'TestClass2..ctor' is unused UnitTests in code or in project
+            // Suppress warning IDE0051 Private member 'TestClass2..ctor' is unused UnitTests in code or in project
 #pragma warning disable IDE0051 // Remove unused private members
             TestClass2( decimal a, decimal? b, decimal c, decimal? d )
 #pragma warning restore IDE0051 // Remove unused private members
@@ -203,12 +203,16 @@ namespace UnitTests
                 // Ожидается 1 строка, приходит 0 - должна быть ошибка
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+			catch( DataLoaderNoRecordsException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "Возвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void DecimalError2()
         {
             using DbReader reader = new(
@@ -225,9 +229,13 @@ namespace UnitTests
                 // Ожидается 1 строка, приходит две - должна быть ошибка
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
-    }
+			catch( DataLoaderTooManyRecordsException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "Возвращен неправильный тип Exception" );
+			}
+		}
+	}
 }

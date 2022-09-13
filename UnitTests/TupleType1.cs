@@ -151,45 +151,91 @@ namespace UnitTests
 
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+			catch( DataLoaderNoRecordsException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
-        public void IntError2()
-        {
-            using DbReader reader = new(
-                "select	A = cast( 12345 as int )" +
-                "   ,   B = cast( 12345 as int )" +
-                "   ,   C = cast( '12345' as varchar(10) )" +
-                "   ,   D = cast( null as bit )" +
-                "   ,   E = cast( 123.45 as money )" +
-                "   ,   F = cast( '51CE512F-1E4F-4995-BE95-A4F7388C88A8' as uniqueidentifier )" +
-                "   ,   G = cast( 0x1234 as varbinary )" +
-                " union all " +
-                "select	A = cast( 12345 as int )" +
-                "   ,   B = cast( null as int )" +
-                "   ,   C = cast( '12345' as varchar(10) )" +
-                "   ,   D = cast( null as bit )" +
-                "   ,   E = cast( 123.45 as money )" +
-                "   ,   F = cast( null as uniqueidentifier )" +
-                "   ,   G = cast( null as varbinary )"
-                );
+		[TestMethod]
+		public void IntError2()
+		{
+			using DbReader reader = new(
+				"select	A = cast( 12345 as int )" +
+				"   ,   B = cast( 12345 as int )" +
+				"   ,   C = cast( '12345' as varchar(10) )" +
+				"   ,   D = cast( null as bit )" +
+				"   ,   E = cast( 123.45 as money )" +
+				"   ,   F = cast( '51CE512F-1E4F-4995-BE95-A4F7388C88A8' as uniqueidentifier )" +
+				"   ,   G = cast( 0x1234 as varbinary )" +
+				" union all " +
+				"select	A = cast( 12345 as int )" +
+				"   ,   B = cast( null as int )" +
+				"   ,   C = cast( '12345' as varchar(10) )" +
+				"   ,   D = cast( null as bit )" +
+				"   ,   E = cast( 123.45 as money )" +
+				"   ,   F = cast( null as uniqueidentifier )" +
+				"   ,   G = cast( null as varbinary )"
+				);
 
-            try
-            {
-                var value = reader
-                    .Load1<Tuple<int, int?, string, bool, decimal, Guid?, byte[]>>();
+			try
+			{
+				var value = reader
+					.Load1<Tuple<int, int?, string, bool?, decimal, Guid?, byte[]>>();
 
-                Assert.Fail();
-            }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+				Assert.Fail();
+			}
+			catch( DataLoaderTooManyRecordsException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-        [TestMethod]
+		[TestMethod]
+		public void IntError3()
+		{
+			using DbReader reader = new(
+				"select	A = cast( 12345 as int )" +
+				"   ,   B = cast( 12345 as int )" +
+				"   ,   C = cast( '12345' as varchar(10) )" +
+				"   ,   D = cast( null as bit )" +
+				"   ,   E = cast( 123.45 as money )" +
+				"   ,   F = cast( '51CE512F-1E4F-4995-BE95-A4F7388C88A8' as uniqueidentifier )" +
+				"   ,   G = cast( 0x1234 as varbinary )" +
+				" union all " +
+				"select	A = cast( 12345 as int )" +
+				"   ,   B = cast( null as int )" +
+				"   ,   C = cast( '12345' as varchar(10) )" +
+				"   ,   D = cast( null as bit )" +
+				"   ,   E = cast( 123.45 as money )" +
+				"   ,   F = cast( null as uniqueidentifier )" +
+				"   ,   G = cast( null as varbinary )"
+				);
+
+			try
+			{
+				var value = reader
+					.Load1<Tuple<int, int?, string, bool, decimal, Guid?, byte[]>>();
+
+				// null нельз€ преобразовать в bool - ошибка, если получилось
+				Assert.Fail();
+			}
+			catch( DataLoaderRuntimeException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
+
+		[TestMethod]
         public void IntErrorNull()
         {
             using DbReader reader = new(
@@ -207,10 +253,15 @@ namespace UnitTests
                 var value = reader
                     .Load1<Tuple<int, int?, string, bool, decimal, Guid?, byte[]>>();
 
+                // null нельз€ преобразовать в bool - ошибка, если получилось
                 Assert.Fail();
             }
-            catch( FastDataLoaderException )
+            catch( DataLoaderRuntimeException )
             {
+            }
+            catch( Exception )
+            {
+                Assert.Fail( "¬озвращен неправильный тип Exception" );
             }
         }
 
@@ -241,12 +292,17 @@ namespace UnitTests
                 .To( out Tuple<int, int, string, bool, decimal, Guid, byte[]>[] value )
                 .End();
 
-                Assert.Fail();
-            }
-            catch( FastDataLoaderException )
-            {
-            }
-        }
+				// null нельз€ преобразовать в bool, Guid и int - ошибка, если получилось
+				Assert.Fail();
+			}
+			catch( DataLoaderRuntimeException )
+			{
+			}
+			catch( Exception )
+			{
+				Assert.Fail( "¬озвращен неправильный тип Exception" );
+			}
+		}
 
-    }
+	}
 }
