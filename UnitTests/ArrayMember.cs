@@ -51,7 +51,24 @@ namespace UnitTests
             public PhoneType[] Phones;
         }
 
-        [TestMethod]
+		public class SimpleNumbers
+		{
+			public string Name { get; private set; }
+
+			public int[] Numbers;
+
+			public static int[] XmlToArray( string xml )
+			{
+				return XElement.Parse( xml )
+					.DescendantNodesAndSelf()
+					.OfType<XText>()
+					.Select( x => (int)Convert.ChangeType( x.Value, typeof(int) ) )
+					.ToArray();
+			}
+
+		}
+
+		[TestMethod]
         public void LoadArray()
         {
             using DbReader reader = new(
@@ -67,5 +84,23 @@ namespace UnitTests
             Assert.AreEqual( "+155512345", data.Phones[ 0 ].Phone );
             Assert.AreEqual( "+155554321", data.Phones[ 1 ].Phone );
         }
-    }
+
+		[TestMethod]
+		public void LoadIntArray()
+		{
+			using DbReader reader = new(
+				"select	Name = 'John'" +
+				"   ,   Numbers = cast('<root><i>12345</i><i>54321</i><i>-10</i></root>' as xml)"
+				);
+			reader
+				.Load()
+				.To( out SimpleNumbers data )
+				.End();
+
+			Assert.AreEqual( 3, data.Numbers.Length );
+			Assert.AreEqual( 12345, data.Numbers[ 0 ] );
+			Assert.AreEqual( 54321, data.Numbers[ 1 ] );
+			Assert.AreEqual( -10, data.Numbers[ 2 ] );
+		}
+	}
 }

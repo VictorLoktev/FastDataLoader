@@ -500,22 +500,33 @@ namespace FastDataLoader
 			if( memberType.IsArray && columnType == typeof( string ) )
 			{
 				// Если членом класса/структуры является массив, то ищем метод,
-				// принимающий xml в параметре типа string и возвращающий массив элементов типа, как у члена
+				// принимающий xml в параметре типа string и возвращающий массив элементов типа, как у члена класса/структуры
 				Type elementOfArrayType = memberType.GetElementType();
-				foreach( MethodInfo mi in elementOfArrayType.GetMethods( BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static ) )
+				// Поиск метода для преобразования xml в массив элементов производится к двух местах:
+				// в типе, где заполняемый массив, и
+				// в типе, который является элементом массива.
+				bool found = false;
+				foreach( Type baseType in new object[] { typeof( T ), elementOfArrayType } )
 				{
-					// Тип, являющийся элементом массива должен иметь статический метод,
-					// возвращающий массив нужного типа и принимающий ровно 1 параметр типа string
-					ParameterInfo[] pi = mi.GetParameters();
-					if( mi.IsStatic &&
-						mi.ReturnType.IsArray &&
-						mi.ReturnType.GetElementType() == elementOfArrayType &&
-						pi != null &&
-						pi.Length == 1 &&
-						pi[ 0 ].ParameterType == columnType )
+					foreach( MethodInfo mi in baseType.GetMethods( BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static ) )
 					{
-						stringToArrayMethod = mi;
+						// Тип, являющийся элементом массива должен иметь статический метод,
+						// возвращающий массив нужного типа и принимающий ровно 1 параметр типа string
+						ParameterInfo[] pi = mi.GetParameters();
+						if( mi.IsStatic &&
+							mi.ReturnType.IsArray &&
+							mi.ReturnType.GetElementType() == elementOfArrayType &&
+							pi != null &&
+							pi.Length == 1 &&
+							pi[ 0 ].ParameterType == columnType )
+						{
+							stringToArrayMethod = mi;
+							found = true;
+							break;
+						}
 					}
+					if( found )
+						break;
 				}
 				if( stringToArrayMethod == null )
 				{

@@ -12,6 +12,10 @@ and does it in maximum performance way using compiled Expressions.
 
 It's free to use and modify.
 
+----
+The assembly uses System.CodeDom messages where System.Int32 is replaced by int.
+
+Do not forget copy System.CodeDom.dll to bin folder!
 
 ----
 
